@@ -15,7 +15,8 @@
   },
   "scripts": {
     "build": "tsup",
-    "dev": "tsup --watch"
+    "dev": "tsup --watch",
+    "demo:ilp-gated-relay": "tsx src/ilp-gated-relay-demo/index.ts"
   },
   "keywords": [
     "examples"
@@ -23,6 +24,12 @@
   "license": "MIT",
   "dependencies": {
     "@agent-society/core": "workspace:*",
-    "@agent-society/relay": "workspace:*"
+    "@agent-society/relay": "workspace:*",
+    "@hono/node-server": "^1.13.7",
+    "nostr-tools": "^2.10.4",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13"
   }
 }
