@@ -30,7 +30,7 @@ This library bridges Nostr and Interledger Protocol (ILP), enabling:
 │  - NostrPeerDiscovery: NIP-02 → peer list                   │
 │  - NostrSpspClient: SPSP over Nostr events                  │
 │  - SocialTrustManager: social graph → credit limits         │
-│  - Event kinds for ILP peering (kind:10032, kind:10047)     │
+│  - Event kinds for ILP peering (kind:10032, kind:23194/95)  │
 └─────────────────────────────────────────────────────────────┘
                               │
                               │ populates
@@ -49,9 +49,10 @@ This library bridges Nostr and Interledger Protocol (ILP), enabling:
 | Kind | Name | Purpose |
 |------|------|---------|
 | `10032` | ILP Peer Info | Replaceable event with connector's ILP address, BTP endpoint, settlement info |
-| `10047` | SPSP Info | Replaceable event with SPSP destination_account and shared_secret |
-| `23194` | SPSP Request | Ephemeral request for fresh SPSP parameters (NIP-47 style) |
-| `23195` | SPSP Response | Ephemeral response with SPSP parameters |
+| `23194` | SPSP Request | NIP-44 encrypted request for fresh SPSP parameters |
+| `23195` | SPSP Response | NIP-44 encrypted response with SPSP destination_account and shared_secret |
+
+**Note:** SPSP uses encrypted request/response (kind:23194/23195) to securely exchange shared secrets. Static publishing was removed as it exposed secrets in plaintext.
 
 ## Key Design Decisions
 
