@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.test.ts
+.git/
+*.md
+packages/examples/
+docs/
+.github/
