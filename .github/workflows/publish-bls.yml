@@ -1,0 +1,110 @@
+# Publish BLS Docker Image to Docker Hub
+#
+# Trigger scenarios and expected tags:
+#   - Push to `main` with packages/bls/ change → `latest`, `sha-abc1234`
+#   - Tag `bls-v1.2.3`                        → `1.2.3`, `sha-abc1234`
+#   - Manual dispatch with version `2.0.0`     → `2.0.0`, `sha-abc1234`
+
+name: Publish BLS Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/bls/**"
+    tags:
+      - "bls-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag for the image (e.g., 1.0.0)"
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: di3twater/agent-society-bls
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up QEMU for multi-architecture builds
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # Step 3: Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Step 4: Log in to Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Step 5: Extract metadata (tags + labels)
+      #
+      # Tag mapping:
+      #   push to main  → type=raw,value=latest
+      #   bls-v* tag    → type=match,pattern=bls-v(.*),group=1  (e.g., bls-v1.2.3 → 1.2.3)
+      #   manual        → type=raw,value=<version input>
+      #   always        → type=sha (short git SHA for traceability)
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=match,pattern=bls-v(.*),group=1
+            type=raw,value=${{ inputs.version }},enable=${{ inputs.version != '' }}
+            type=sha,prefix=sha-
+
+      # Step 6: Build and push multi-architecture image
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: packages/bls/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Step 7: Run Trivy vulnerability scan on the pushed image
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.33.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          format: table
+
+      # Step 8: Generate SBOM with Trivy (supply chain transparency)
+      - name: Generate SBOM
+        uses: aquasecurity/trivy-action@0.33.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: cyclonedx
+          output: sbom.cdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cdx.json
