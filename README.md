@@ -1,159 +1,176 @@
 # Agent Society
 
-**Your social connections become your payment network.**
+Nostr-native peer discovery and ILP payment routing for autonomous agents.
 
-Agent Society turns [Nostr](https://nostr.com/) social graphs into [Interledger](https://interledger.org/) payment networks. Instead of manually configuring payment peers, agents automatically discover and connect to peers through their Nostr follow lists. Follow someone on Nostr, and your agents can route payments to each other.
+Agents publish their ILP connector info as Nostr events, discover each other through relays, negotiate settlement chains via encrypted SPSP handshakes, and open payment channels -- all without manual configuration.
 
-It also provides **ILP-gated Nostr relays** -- relays where writing costs a micropayment, making them spam-resistant and economically sustainable for autonomous agents.
+## The Protocol
 
-## How It Works
+Three Nostr event kinds power the entire peering lifecycle:
 
-1. **You follow someone on Nostr.** Your agent sees the follow list update.
-2. **Your agent looks up their ILP info** published as a Nostr event.
-3. **The agents perform an encrypted handshake** to exchange payment setup parameters.
-4. **A payment route is established.** Your ILP connector now knows how to reach them.
+| Kind | Name | What it does |
+|------|------|-------------|
+| **10032** | ILP Peer Info | Replaceable event advertising an agent's ILP address, settlement chains, and token preferences |
+| **23194** | SPSP Request | NIP-44 encrypted request to negotiate a payment channel (sent as ILP packet data) |
+| **23195** | SPSP Response | NIP-44 encrypted response containing the negotiated chain, settlement address, and channel ID |
 
-Social distance (how many hops away someone is in the follow graph) determines how much credit you extend. Close friends get higher limits. Strangers get none.
+A new agent joins the network in three phases:
 
 ```
-Alice follows Bob on Nostr
-        │
-        ▼
-Alice's agent discovers Bob's ILP info (kind:10032 event)
-        │
-        ▼
-Encrypted SPSP handshake over Nostr (kinds 23194/23195)
-        │
-        ▼
-Alice's ILP connector can now route payments to Bob
+Joiner                                    Genesis (accepts free SPSP)
+  │                                           │
+  │  1. DISCOVER: query relay for kind:10032  │
+  │  ─────── Nostr WebSocket ───────────────> │
+  │                                           │
+  │  2. HANDSHAKE: send kind:23194 via ILP    │
+  │  ─────── ILP packet routing ────────────> │
+  │                                           │  negotiate chain
+  │                                           │  open payment channel
+  │                                           │  return channel ID
+  │  <─────── ILP FULFILL ─────────────────── │
+  │                                           │
+  │  3. ANNOUNCE: send kind:10032 via ILP     │
+  │  ─────── ILP packet (paid) ────────────> │
+  │                                           │  store event
+  │                                           │  return FULFILL
 ```
+
+After bootstrap, a **RelayMonitor** watches the relay for new kind:10032 events and repeats the handshake with each newly discovered peer.
 
 ## Packages
 
-This is a monorepo with four packages:
+| Package | Purpose |
+|---------|---------|
+| [`@agent-society/core`](packages/core) | Peer discovery, SPSP handshakes, settlement negotiation, trust scoring, and the `createAgentSocietyNode()` composition API |
+| [`@agent-society/relay`](packages/relay) | Nostr relay with ILP payment gating -- pay to write, free to read |
+| [`@agent-society/bls`](packages/bls) | Business Logic Server -- validates ILP payments and stores Nostr events |
+| [`@agent-society/examples`](packages/examples) | Demo scripts for the ILP-gated relay |
 
-| Package | Description |
-|---------|-------------|
-| [`@agent-society/core`](packages/core) | Peer discovery, SPSP handshakes, and social trust scoring |
-| [`@agent-society/bls`](packages/bls) | Business Logic Server -- validates ILP payments for event storage |
-| [`@agent-society/relay`](packages/relay) | Nostr relay with ILP payment gating (pay-to-write, free-to-read) |
-| [`@agent-society/examples`](packages/examples) | Example implementations |
+## Two Modes
 
-## Quick Start
+### Embedded Mode (npm library)
 
-### Prerequisites
-
-- Node.js 20+
-- pnpm 8+
-
-### Install and Build
-
-```bash
-pnpm install
-pnpm build
-```
-
-### Run Tests
-
-```bash
-pnpm test
-```
-
-### Discover Peers
+Use `createAgentSocietyNode()` to run everything in-process with zero network overhead. The connector's methods are called directly -- no HTTP.
 
 ```typescript
-import { BootstrapService, SocialPeerDiscovery } from '@agent-society/core';
+import { ConnectorNode } from '@agent-society/connector';
+import { createAgentSocietyNode } from '@agent-society/core';
+import { encodeEventToToon, decodeEventFromToon } from '@agent-society/relay';
 
-// Bootstrap with known peers (genesis file, ArDrive registry, env vars)
-const bootstrap = new BootstrapService(config, secretKey, ownIlpInfo);
-bootstrap.setConnectorAdmin(adminClient);
-await bootstrap.bootstrap();
+const connector = new ConnectorNode(connectorConfig, logger);
 
-// Watch your follow list and auto-peer with new follows
-const discovery = new SocialPeerDiscovery(config, secretKey, ownIlpInfo);
-discovery.setConnectorAdmin(adminClient);
-discovery.start();
-```
-
-### Request Payment Setup from a Peer
-
-```typescript
-import { NostrSpspClient } from '@agent-society/core';
-
-const client = new NostrSpspClient(relays, pool, secretKey);
-const params = await client.requestSpspInfo(peerPubkey);
-
-console.log(`Pay to: ${params.destinationAccount}`);
-console.log(`Secret: ${params.sharedSecret}`);
-```
-
-### Compute Trust-Based Credit Limits
-
-```typescript
-import { SocialTrustManager } from '@agent-society/core';
-
-const trustManager = new SocialTrustManager(pool, relays, myPubkey, {
-  baseCreditForFollowed: 10000n,
-  mutualFollowerBonus: 1000n,
-  maxCreditLimit: 100000n,
+const node = createAgentSocietyNode({
+  connector,
+  handlePacket,           // your incoming ILP packet handler
+  secretKey,              // 32-byte Nostr secret key
+  ilpInfo: {
+    ilpAddress: 'g.agent.peer1',
+    btpEndpoint: 'btp+ws://localhost:3000',
+    assetCode: 'USD',
+    assetScale: 6,
+    supportedChains: ['evm:base:84532'],
+    settlementAddresses: { 'evm:base:84532': '0x6AFbC4...' },
+    preferredTokens: { 'evm:base:84532': '0x39eaF9...' },
+    tokenNetworks: { 'evm:base:84532': '0x733b89...' },
+  },
+  toonEncoder: encodeEventToToon,
+  toonDecoder: decodeEventFromToon,
+  relayUrl: 'ws://relay.example.com',
+  knownPeers: [{ pubkey: genesisPubkey, relayUrl, btpEndpoint }],
+  settlementInfo,
+  basePricePerByte: 10n,
 });
 
-await trustManager.initialize();
+// Listen to lifecycle events
+node.bootstrapService.on((event) => console.log(event));
+node.relayMonitor.on((event) => console.log(event));
 
-const trust = await trustManager.computeTrust(peerPubkey);
-console.log(`Credit limit: ${trust.creditLimit}`);
-console.log(`Trust score: ${trust.score}/100`);
+// Start: discover peers, handshake, open channels, announce
+const result = await node.start();
+console.log(`${result.peerCount} peers, ${result.channelCount} channels`);
+
+// Payment channel operations (requires @agent-society/connector >=1.2.0)
+if (node.channelClient) {
+  const state = await node.channelClient.getChannelState(channelId);
+}
 ```
 
-## ILP-Gated Relay
+### Docker Mode (distributed)
 
-The relay package implements a Nostr relay where **writing costs a micropayment** but **reading is free**. This creates spam-resistant infrastructure for autonomous agents.
-
-- Events are submitted with an ILP payment that covers storage cost
-- Pricing is configurable: per-byte base rate with per-event-kind overrides
-- The relay owner's own events bypass payment
-- Standard NIP-01 reads (REQ/EVENT/EOSE) work normally over WebSocket
-
-## Docker
-
-An all-in-one Docker container runs the relay, BLS, and peer discovery together.
+Run the relay, BLS, and bootstrap as a container. Communicates with an external ILP connector via HTTP.
 
 ```bash
 docker build -f docker/Dockerfile -t agent-society .
 docker run -p 3100:3100 -p 7100:7100 \
-  -e NODE_ID=peer1 \
   -e NOSTR_SECRET_KEY=<64-char-hex> \
   -e ILP_ADDRESS=g.agent.peer1 \
-  -e BTP_ENDPOINT=ws://peer1:3000 \
-  -e CONNECTOR_ADMIN_URL=http://peer1:8081 \
+  -e BTP_ENDPOINT=ws://connector:3000 \
+  -e AGENT_RUNTIME_URL=http://connector:8081 \
+  -e SUPPORTED_CHAINS=evm:base:84532 \
+  -e SETTLEMENT_ADDRESS_evm_base_84532=0x6AFbC4... \
   agent-society
 ```
 
 | Port | Service |
 |------|---------|
-| 3100 | BLS HTTP server (payment validation) |
+| 3100 | BLS HTTP -- receives ILP packets at `POST /handle-packet` |
 | 7100 | Nostr relay WebSocket (NIP-01) |
 
-## Peer Discovery Layers
+## ILP-Gated Relay
 
-Peers are discovered from multiple sources, checked in order:
+The relay is a standard Nostr relay with one addition: **writing costs a micropayment**.
 
-1. **Genesis peers** -- hardcoded bootstrap nodes in `genesis-peers.json`
-2. **ArDrive registry** -- peer list stored on Arweave for permanence
-3. **Environment variable** -- additional peers via `ADDITIONAL_PEERS` JSON
-4. **Social graph** -- real-time monitoring of your Nostr follow list
+- Events are TOON-encoded (binary Nostr event) and sent as ILP packet data
+- The BLS validates that `payment >= bytes * basePricePerByte`
+- The relay owner's events bypass payment (self-write)
+- SPSP requests (kind:23194) can have a lower minimum price for bootstrap
+- Reading is free -- standard NIP-01 `REQ`/`EVENT`/`EOSE` over WebSocket
 
-## Nostr Event Kinds
+## Settlement
 
-| Kind | Name | Purpose |
-|------|------|---------|
-| `10032` | ILP Peer Info | Replaceable event advertising a connector's ILP address, BTP endpoint, and settlement info |
-| `23194` | SPSP Request | NIP-44 encrypted request for payment setup parameters |
-| `23195` | SPSP Response | NIP-44 encrypted response with destination account and shared secret |
+Agents negotiate settlement on-chain during the SPSP handshake:
+
+1. Both sides advertise supported chains (e.g., `evm:base:84532`)
+2. `negotiateSettlementChain()` finds the best chain intersection
+3. `resolveTokenForChain()` picks the token both prefer
+4. `connector.openChannel()` opens a payment channel on-chain
+5. The channel ID is included in the SPSP response
+
+Chain identifiers use the format `{blockchain}:{network}:{chainId}` (e.g., `evm:base:84532`, `xrp:mainnet`).
+
+## Peer Discovery
+
+Peers are discovered from multiple sources:
+
+1. **Known peers** -- passed directly via config (genesis nodes)
+2. **ArDrive registry** -- peer list stored on Arweave
+3. **Environment variable** -- `ADDITIONAL_PEERS` JSON
+4. **Relay monitor** -- watches relay for new kind:10032 events in real-time
+
+## Trust
+
+Social distance in the Nostr follow graph determines credit limits:
+
+- **Direct follow** -- highest trust, largest credit limit
+- **2 hops** -- moderate trust
+- **3+ hops** -- low or zero trust
+- **Mutual follows** and **zap reputation** (NIP-57) increase trust scores
+
+## Quick Start
+
+```bash
+# Prerequisites: Node.js 20+, pnpm 8+
+pnpm install
+pnpm build
+pnpm test
+
+# Run the ILP-gated relay demo
+pnpm demo:ilp-gated-relay
+```
 
 ## Related Specs
 
-- [NIP-02: Follow List](https://github.com/nostr-protocol/nips/blob/master/02.md) -- social graph that drives peer discovery
+- [NIP-02: Follow List](https://github.com/nostr-protocol/nips/blob/master/02.md) -- social graph for peer discovery
 - [NIP-44: Encrypted Payloads](https://github.com/nostr-protocol/nips/blob/master/44.md) -- secures SPSP handshakes
 - [SPSP (RFC 0009)](https://interledger.org/developers/rfcs/simple-payment-setup-protocol/) -- payment setup protocol
 - [Peering, Clearing and Settlement (RFC 0032)](https://interledger.org/developers/rfcs/peering-clearing-settling/) -- ILP peering model

@@ -3,7 +3,7 @@
  *
  * Simulates ILP STREAM payments for local testing without real payments.
  * In a real deployment, the ILP connector would handle STREAM packet routing,
- * but for demo purposes this directly calls the BLS /handle-payment endpoint.
+ * but for demo purposes this directly calls the BLS /handle-packet endpoint.
  */
 
 import { encodeEventToToon } from '@agent-society/relay';
@@ -34,7 +34,7 @@ export interface MockConnectorConfig {
  * MockIlpConnector simulates what a real ILP connector does:
  * 1. Receives a Nostr event from the agent
  * 2. TOON-encodes the event into bytes
- * 3. Makes HTTP POST to BLS /handle-payment with amount and encoded data
+ * 3. Makes HTTP POST to BLS /handle-packet with amount and encoded data
  * 4. Returns accept/reject result to the agent
  *
  * This allows testing the full payment flow without a real ILP network.
@@ -63,7 +63,7 @@ export class MockIlpConnector {
     const base64Data = Buffer.from(toonBytes).toString('base64');
 
     // Make the payment request to BLS
-    const response = await fetch(`${this.blsUrl}/handle-payment`, {
+    const response = await fetch(`${this.blsUrl}/handle-packet`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

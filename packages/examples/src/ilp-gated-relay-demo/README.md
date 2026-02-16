@@ -119,7 +119,7 @@ Demo Complete!
 Starts the ILP-gated relay with two servers:
 
 - **BLS (Business Logic Server)**: HTTP server on port 3100
-  - Endpoint: `POST /handle-payment`
+  - Endpoint: `POST /handle-packet`
   - Verifies payment amount, validates event signature, stores event
   - Returns fulfillment on success or ILP error code on failure
 
@@ -144,7 +144,7 @@ Simulates an ILP connector for local testing:
 
 - Takes a Nostr event and payment amount
 - TOON-encodes the event
-- POSTs to BLS `/handle-payment` endpoint
+- POSTs to BLS `/handle-packet` endpoint
 - Returns accept/reject response
 
 In production, the ILP connector would handle STREAM packet routing, but the mock allows testing without a real ILP network.
@@ -262,7 +262,7 @@ If ports 3100 or 7100 are in use:
 ### BLS Request Format
 
 ```typescript
-POST /handle-payment
+POST /handle-packet
 Content-Type: application/json
 
 {
