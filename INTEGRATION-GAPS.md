@@ -9,18 +9,18 @@
 
 Epic 7 and Epic 8 are **60-75% complete**. The core infrastructure (types, event builders/parsers, TOON encoding, ILP packet sending, bootstrap phases) is in place and working. However, **settlement negotiation and payment channel opening are not wired into the ILP code path**, causing the bootstrap flow to complete without establishing payment channels.
 
-**Critical Impact:** The 5-phase bootstrap flow executes through Phase 4, but payment channels are never opened because the settlement negotiation logic exists in `NostrSpspServer` (for direct Nostr SPSP) but not in the BLS `/handle-payment` handler (for ILP-routed SPSP).
+**Critical Impact:** The 5-phase bootstrap flow executes through Phase 4, but payment channels are never opened because the settlement negotiation logic exists in `NostrSpspServer` (for direct Nostr SPSP) but not in the BLS `/handle-packet` handler (for ILP-routed SPSP).
 
 ---
 
-## Gap 1: BLS `/handle-payment` Missing Settlement Negotiation ❌ CRITICAL
+## Gap 1: BLS `/handle-packet` Missing Settlement Negotiation ❌ CRITICAL
 
 **File:** `docker/src/entrypoint.ts` lines 331-390
 **Epic:** 7 (Story 7.3)
 
 ### Current Implementation
 
-The BLS `/handle-payment` endpoint handles kind:23194 SPSP requests but:
+The BLS `/handle-packet` endpoint handles kind:23194 SPSP requests but:
 1. Parses the request (NIP-44 decrypt)
 2. Generates `destinationAccount` + `sharedSecret`
 3. Builds kind:23195 response with only those two fields
@@ -109,7 +109,7 @@ const channelClient: ConnectorChannelClient = {
 };
 ```
 
-Then pass to both `NostrSpspServer` (line 536) AND wire into BLS `/handle-payment` handler.
+Then pass to both `NostrSpspServer` (line 536) AND wire into BLS `/handle-packet` handler.
 
 ### Why It Matters
 
@@ -169,7 +169,7 @@ There are **two separate implementations** of SPSP handling:
 - Calls connector Admin API for channel opening
 - Publishes kind:23195 response to relay
 
-**Path 2: ILP-Routed SPSP** (BLS `/handle-payment`)
+**Path 2: ILP-Routed SPSP** (BLS `/handle-packet`)
 - Receives kind:23194 via ILP PREPARE → connector → agent-runtime → BLS HTTP
 - Has NO settlement negotiation logic
 - Just generates destinationAccount + sharedSecret
@@ -189,8 +189,8 @@ The ILP bootstrap flow (Phase 3) uses Path 2, which lacks settlement negotiation
 
 Either:
 - **Option A:** Extract settlement logic from `NostrSpspServer.negotiateSettlement()` into a shared function, call it from both paths
-- **Option B:** Route ILP-received SPSP requests through `NostrSpspServer` instead of handling in `/handle-payment`
-- **Option C:** Duplicate the settlement logic in the BLS `/handle-payment` handler (code duplication, not ideal)
+- **Option B:** Route ILP-received SPSP requests through `NostrSpspServer` instead of handling in `/handle-packet`
+- **Option C:** Duplicate the settlement logic in the BLS `/handle-packet` handler (code duplication, not ideal)
 
 ---
 
@@ -285,7 +285,7 @@ The BLS's fulfillment is returned in the HTTP response but **agent-runtime ignor
 
 ### Fix Required
 
-Remove `fulfillment` field from `HandlePaymentAcceptResponse` return in `entrypoint.ts` lines 369-376 and 413-420.
+Remove `fulfillment` field from `HandlePacketAcceptResponse` return in `entrypoint.ts` lines 369-376 and 413-420.
 
 ---
 
@@ -514,7 +514,7 @@ This is a **test/verification gap**, not a code gap.
 ## Priority Fix Order
 
 ### P0 - Critical (Bootstrap Broken)
-1. **Gap 1:** Add settlement negotiation to BLS `/handle-payment` handler for kind:23194
+1. **Gap 1:** Add settlement negotiation to BLS `/handle-packet` handler for kind:23194
 2. **Gap 2:** Create `ConnectorChannelClient` HTTP implementation
 3. **Gap 6:** Fix `accepted` vs `fulfilled` field mismatch (coordinate with agent-runtime)
 
