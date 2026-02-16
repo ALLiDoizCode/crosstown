@@ -7,12 +7,9 @@ import { EventFeed } from "@/components/shared/EventFeed";
 import { TrustBadge } from "@/components/shared/TrustBadge";
 import { TrustBreakdown } from "@/components/shared/TrustBreakdown";
 import { AGENTS, EDGES, generateEvents, type Agent, trustColor } from "@/data/mock-agents";
-import { generateMixedFeed, type MixedFeedItem } from "@/data/mock-social";
-import { NoteCard } from "@/components/shared/NoteCard";
 import { Activity, TrendingUp, Network, X } from "lucide-react";
 
 const events = generateEvents(15);
-const mixedFeed = generateMixedFeed(5, 10);
 
 export default function SplitObservatory() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);

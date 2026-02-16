@@ -19,10 +19,8 @@ import {
 } from "lucide-react";
 import { SocialFeed } from "@/components/shared/SocialFeed";
 import { AgentProfile } from "@/components/shared/AgentProfile";
-import { generateMixedFeed } from "@/data/mock-social";
 
 const events = generateEvents(15);
-const mixedFeed = generateMixedFeed(8, 10);
 
 export default function TabbedDashboard() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);

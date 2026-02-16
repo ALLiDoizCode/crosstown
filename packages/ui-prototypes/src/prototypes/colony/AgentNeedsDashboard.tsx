@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TrustBadge } from "@/components/shared/TrustBadge";
 import { TrustBreakdown } from "@/components/shared/TrustBreakdown";
-import { AGENTS, EDGES, generateEvents, type Agent, trustColor } from "@/data/mock-agents";
+import { AGENTS, EDGES, type Agent, trustColor } from "@/data/mock-agents";
 import {
   Droplets, Activity, Shield, AlertTriangle, CheckCircle2,
   Heart, Brain, Route, Users, Minus, MessageSquare
@@ -13,7 +13,6 @@ import {
 import { generateMixedFeed } from "@/data/mock-social";
 import { NoteCard } from "@/components/shared/NoteCard";
 
-const events = generateEvents(8);
 const mixedFeed = generateMixedFeed(5, 8);
 
 interface Need {
@@ -298,7 +297,7 @@ export default function AgentNeedsDashboard() {
 
             <TabsContent value="history">
               <div className="max-w-2xl space-y-3">
-                {mixedFeed.map((item, i) => {
+                {mixedFeed.map((item, _i) => {
                   if (item.kind === "note") {
                     return <NoteCard key={`note-${item.data.id}`} note={item.data} compact onAgentClick={(id) => {
                       const a = AGENTS.find(a => a.id === id);

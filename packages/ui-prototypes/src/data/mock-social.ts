@@ -1,4 +1,4 @@
-import { type ActivityEvent, generateEvents, AGENTS, EDGES } from "./mock-agents";
+import { type ActivityEvent, generateEvents } from "./mock-agents";
 
 // --- Types ---
 

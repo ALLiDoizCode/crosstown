@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { TrustBadge } from "@/components/shared/TrustBadge";
 import { TrustBreakdown } from "@/components/shared/TrustBreakdown";
 import {
-  AGENTS, EDGES, generateEvents, DVM_SERVICES, COMMUNITIES,
+  AGENTS, EDGES, DVM_SERVICES, COMMUNITIES,
   type Agent, type ActivityEvent, getAgentById
 } from "@/data/mock-agents";
 import {
@@ -17,9 +17,8 @@ import {
 } from "lucide-react";
 import { AgentProfile } from "@/components/shared/AgentProfile";
 import { NoteCard } from "@/components/shared/NoteCard";
-import { generateMixedFeed, getRootNotes, type MixedFeedItem } from "@/data/mock-social";
+import { generateMixedFeed, getRootNotes } from "@/data/mock-social";
 
-const events = generateEvents(15);
 const mixedFeed = generateMixedFeed(10, 15);
 const trendingNotes = getRootNotes()
   .sort((a, b) => (b.reactions.likes + b.reactions.zaps) - (a.reactions.likes + a.reactions.zaps))
@@ -50,10 +49,6 @@ export default function UnifiedFeedSidebar() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [sidebarView, setSidebarView] = useState<SidebarView>("network");
   const [activeFilters, setActiveFilters] = useState<Set<ActivityEvent["type"]>>(new Set());
-  const filteredEvents = activeFilters.size === 0
-    ? events
-    : events.filter(e => activeFilters.has(e.type));
-
   const toggleFilter = (type: ActivityEvent["type"]) => {
     setActiveFilters(prev => {
       const next = new Set(prev);
@@ -121,7 +116,7 @@ export default function UnifiedFeedSidebar() {
           {/* Mixed feed: notes + events */}
           <ScrollArea className="flex-1">
             <div className="divide-y divide-border/50">
-              {mixedFeed.map((item, i) => {
+              {mixedFeed.map((item, _i) => {
                 if (item.kind === "note") {
                   const note = item.data;
                   return (

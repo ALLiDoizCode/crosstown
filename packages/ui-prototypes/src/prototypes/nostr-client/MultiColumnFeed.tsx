@@ -12,7 +12,7 @@ import {
 } from "@/data/mock-agents";
 import {
   MessageSquare, Network, Bot, Users, Hash, Zap, Star,
-  Plus, Settings, Bell, Search, Activity
+  Plus, Settings, Bell, Search
 } from "lucide-react";
 
 const events = generateEvents(15);
