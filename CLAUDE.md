@@ -1,39 +1,40 @@
-# Agent Society Protocol
+# Crosstown Protocol
 
-A Nostr-based protocol for Interledger peer discovery, SPSP handshakes, and social graph-informed payment routing.
+A Nostr relay that solves the relay business model by also being an ILP connector that gates writes with micropayments.
 
 ## Project Overview
 
-This library bridges Nostr and Interledger Protocol (ILP), enabling:
+Crosstown is an ILP-gated Nostr relay. It bridges Nostr and Interledger Protocol (ILP), enabling:
 
 1. **Peer Discovery via NIP-02**: Use Nostr follow lists to discover ILP peers
 2. **SPSP over Nostr**: Exchange SPSP parameters via Nostr events instead of HTTPS
-3. **Social Graph → Trust**: Derive credit limits and routing preferences from social relationships
+3. **ILP-Gated Writes**: Pay to write events, free to read — relay sustainability through micropayments
 4. **Decentralized Connector Registry**: Publish and discover connector info via relays
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Individual Agents                         │
-│                                                             │
-│  - Own their Nostr identity (keypair)                       │
-│  - Manage their follow list (who they peer with)            │
-│  - Import this library for ILP integration                  │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ uses
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│              @agent-society/protocol (this library)          │
+│               @crosstown/core (library)                     │
 │                                                             │
 │  - NostrPeerDiscovery: NIP-02 → peer list                   │
 │  - NostrSpspClient: SPSP over Nostr events                  │
-│  - SocialTrustManager: social graph → credit limits         │
+│  - BootstrapService: join network, handshake, announce      │
 │  - Event kinds for ILP peering (kind:10032, kind:23194/95)  │
 └─────────────────────────────────────────────────────────────┘
                               │
                               │ populates
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│            @crosstown/relay + @crosstown/bls                │
+│                                                             │
+│  - Nostr relay (NIP-01 WebSocket)                           │
+│  - BLS validates ILP payments, stores events                │
+│  - TOON-native: events stored and served in TOON format     │
+│  - Pay to write, free to read                               │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │ routes packets
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    ILP Connector                             │
@@ -62,12 +63,14 @@ NIP-02 follows represent peering relationships. If Alice follows Bob, Alice trus
 ### Nostr Populates, Doesn't Replace
 The Nostr layer is for discovery and configuration. Actual packet routing uses local routing tables in the connector.
 
-### Trust Derivation
-Credit limits can be computed from:
-- Social distance (hops in follow graph)
-- Mutual followers
-- Reputation (NIP-57 zaps received)
-- Historical payment success
+### Pay to Write, Free to Read
+The relay gates EVENT writes with ILP micropayments, solving the relay sustainability problem. Reading via REQ/EVENT/EOSE is free.
+
+### TOON-Native
+Events are encoded in [TOON format](https://github.com/nicholasgasior/toon) throughout the stack — written as TOON in ILP packets, stored as TOON in the event store, and returned as TOON from the relay. TOON is the native wire format, designed for agent digestion rather than human readability.
+
+### Discovery ≠ Peering
+The RelayMonitor discovers new peers (kind:10032) and emits events, but does **not** automatically initiate peering. The `CrosstownNode` exposes `peerWith()` as a method so the caller can decide when and whether to peer. Discovery is passive observation; peering is an explicit decision.
 
 ## Development Guidelines
 

@@ -1,8 +1,8 @@
-# Agent Society
+# Crosstown
 
-Nostr-native peer discovery and ILP payment routing for autonomous agents.
+A Nostr relay that solves the relay business model by also being an ILP connector that gates writes with micropayments.
 
-Agents publish their ILP connector info as Nostr events, discover each other through relays, negotiate settlement chains via encrypted SPSP handshakes, and open payment channels -- all without manual configuration.
+Nodes publish their ILP connector info as Nostr events, discover each other through relays, negotiate settlement chains via encrypted SPSP handshakes, and open payment channels -- all without manual configuration.
 
 ## The Protocol
 
@@ -10,11 +10,11 @@ Three Nostr event kinds power the entire peering lifecycle:
 
 | Kind | Name | What it does |
 |------|------|-------------|
-| **10032** | ILP Peer Info | Replaceable event advertising an agent's ILP address, settlement chains, and token preferences |
+| **10032** | ILP Peer Info | Replaceable event advertising a node's ILP address, settlement chains, and token preferences |
 | **23194** | SPSP Request | NIP-44 encrypted request to negotiate a payment channel (sent as ILP packet data) |
 | **23195** | SPSP Response | NIP-44 encrypted response containing the negotiated chain, settlement address, and channel ID |
 
-A new agent joins the network in three phases:
+A new node joins the network in three phases:
 
 ```
 Joiner                                    Genesis (accepts free SPSP)
@@ -41,25 +41,25 @@ After bootstrap, a **RelayMonitor** watches the relay for new kind:10032 events 
 
 | Package | Purpose |
 |---------|---------|
-| [`@agent-society/core`](packages/core) | Peer discovery, SPSP handshakes, settlement negotiation, trust scoring, and the `createAgentSocietyNode()` composition API |
-| [`@agent-society/relay`](packages/relay) | Nostr relay with ILP payment gating -- pay to write, free to read |
-| [`@agent-society/bls`](packages/bls) | Business Logic Server -- validates ILP payments and stores Nostr events |
-| [`@agent-society/examples`](packages/examples) | Demo scripts for the ILP-gated relay |
+| [`@crosstown/core`](packages/core) | Peer discovery, SPSP handshakes, settlement negotiation, and the `createCrosstownNode()` composition API |
+| [`@crosstown/relay`](packages/relay) | Nostr relay with ILP payment gating -- pay to write, free to read |
+| [`@crosstown/bls`](packages/bls) | Business Logic Server -- validates ILP payments and stores Nostr events |
+| [`@crosstown/examples`](packages/examples) | Demo scripts for the ILP-gated relay |
 
 ## Two Modes
 
 ### Embedded Mode (npm library)
 
-Use `createAgentSocietyNode()` to run everything in-process with zero network overhead. The connector's methods are called directly -- no HTTP.
+Use `createCrosstownNode()` to run everything in-process with zero network overhead. The connector's methods are called directly -- no HTTP.
 
 ```typescript
-import { ConnectorNode } from '@agent-society/connector';
-import { createAgentSocietyNode } from '@agent-society/core';
-import { encodeEventToToon, decodeEventFromToon } from '@agent-society/relay';
+import { ConnectorNode } from '@crosstown/connector';
+import { createCrosstownNode } from '@crosstown/core';
+import { encodeEventToToon, decodeEventFromToon } from '@crosstown/relay';
 
 const connector = new ConnectorNode(connectorConfig, logger);
 
-const node = createAgentSocietyNode({
+const node = createCrosstownNode({
   connector,
   handlePacket,           // your incoming ILP packet handler
   secretKey,              // 32-byte Nostr secret key
@@ -89,7 +89,7 @@ node.relayMonitor.on((event) => console.log(event));
 const result = await node.start();
 console.log(`${result.peerCount} peers, ${result.channelCount} channels`);
 
-// Payment channel operations (requires @agent-society/connector >=1.2.0)
+// Payment channel operations (requires @crosstown/connector >=1.2.0)
 if (node.channelClient) {
   const state = await node.channelClient.getChannelState(channelId);
 }
@@ -100,7 +100,7 @@ if (node.channelClient) {
 Run the relay, BLS, and bootstrap as a container. Communicates with an external ILP connector via HTTP.
 
 ```bash
-docker build -f docker/Dockerfile -t agent-society .
+docker build -f docker/Dockerfile -t crosstown .
 docker run -p 3100:3100 -p 7100:7100 \
   -e NOSTR_SECRET_KEY=<64-char-hex> \
   -e ILP_ADDRESS=g.agent.peer1 \
@@ -108,7 +108,7 @@ docker run -p 3100:3100 -p 7100:7100 \
   -e AGENT_RUNTIME_URL=http://connector:8081 \
   -e SUPPORTED_CHAINS=evm:base:84532 \
   -e SETTLEMENT_ADDRESS_evm_base_84532=0x6AFbC4... \
-  agent-society
+  crosstown
 ```
 
 | Port | Service |
@@ -128,7 +128,7 @@ The relay is a standard Nostr relay with one addition: **writing costs a micropa
 
 ## Settlement
 
-Agents negotiate settlement on-chain during the SPSP handshake:
+Nodes negotiate settlement on-chain during the SPSP handshake:
 
 1. Both sides advertise supported chains (e.g., `evm:base:84532`)
 2. `negotiateSettlementChain()` finds the best chain intersection
@@ -146,15 +146,6 @@ Peers are discovered from multiple sources:
 2. **ArDrive registry** -- peer list stored on Arweave
 3. **Environment variable** -- `ADDITIONAL_PEERS` JSON
 4. **Relay monitor** -- watches relay for new kind:10032 events in real-time
-
-## Trust
-
-Social distance in the Nostr follow graph determines credit limits:
-
-- **Direct follow** -- highest trust, largest credit limit
-- **2 hops** -- moderate trust
-- **3+ hops** -- low or zero trust
-- **Mutual follows** and **zap reputation** (NIP-57) increase trust scores
 
 ## Quick Start
 

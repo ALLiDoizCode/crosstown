@@ -15,7 +15,7 @@ import {
   BusinessLogicServer,
   NostrRelayServer,
   type EventStore,
-} from '@agent-society/relay';
+} from '@crosstown/relay';
 
 // Default ports for the servers
 const DEFAULT_BLS_PORT = 3100;

@@ -1,8 +1,8 @@
-# ElizaOS Integration Handoff: agent-society
+# ElizaOS Integration Handoff: crosstown
 
 ## Goal
 
-Publish `@agent-society/core`, `@agent-society/bls`, and `@agent-society/relay` as npm packages, then create a new `@agent-society/elizaos-plugin` package that wraps everything — including the refactored `@agent-runtime/connector` — as ElizaOS Services, Actions, and Providers.
+Publish `@crosstown/core`, `@crosstown/bls`, and `@crosstown/relay` as npm packages, then create a new `@crosstown/elizaos-plugin` package that wraps everything — including the refactored `@agent-runtime/connector` — as ElizaOS Services, Actions, and Providers.
 
 ---
 
@@ -22,10 +22,10 @@ The three packages **build successfully** and have clean public APIs. They're ~9
 
 | Package | Builds | Types (.d.ts) | `files` field | README | Blockers |
 |---------|--------|---------------|---------------|--------|----------|
-| `@agent-society/core` | Yes | Yes (49 KB) | `["dist"]` | Missing | Missing metadata fields |
-| `@agent-society/bls` | Yes | Yes (12 KB) | `["dist"]` | Yes (6.5 KB) | Missing metadata fields |
-| `@agent-society/relay` | Yes | Yes (13 KB) | `["dist"]` | Missing | Missing metadata, `workspace:*` deps |
-| `@agent-society/examples` | N/A | N/A | N/A | N/A | `private: true` — do not publish |
+| `@crosstown/core` | Yes | Yes (49 KB) | `["dist"]` | Missing | Missing metadata fields |
+| `@crosstown/bls` | Yes | Yes (12 KB) | `["dist"]` | Yes (6.5 KB) | Missing metadata fields |
+| `@crosstown/relay` | Yes | Yes (13 KB) | `["dist"]` | Missing | Missing metadata, `workspace:*` deps |
+| `@crosstown/examples` | N/A | N/A | N/A | N/A | `private: true` — do not publish |
 
 ### 1.2 Metadata to Add (All Packages)
 
@@ -35,7 +35,7 @@ Each package.json needs:
 {
   "repository": {
     "type": "git",
-    "url": "https://github.com/ALLiDoizCode/agent-society.git",
+    "url": "https://github.com/ALLiDoizCode/crosstown.git",
     "directory": "packages/<package-name>"
   },
   "author": "...",
@@ -48,22 +48,22 @@ Each package.json needs:
 
 ### 1.3 Fix workspace:* References
 
-`@agent-society/relay` depends on core and bls using `workspace:*`. Before publishing, these must become real version ranges:
+`@crosstown/relay` depends on core and bls using `workspace:*`. Before publishing, these must become real version ranges:
 
 ```jsonc
 // packages/relay/package.json — BEFORE
 {
   "dependencies": {
-    "@agent-society/bls": "workspace:*",
-    "@agent-society/core": "workspace:*"
+    "@crosstown/bls": "workspace:*",
+    "@crosstown/core": "workspace:*"
   }
 }
 
 // packages/relay/package.json — AFTER
 {
   "dependencies": {
-    "@agent-society/bls": "^1.0.0",
-    "@agent-society/core": "^1.0.0"
+    "@crosstown/bls": "^1.0.0",
+    "@crosstown/core": "^1.0.0"
   }
 }
 ```
@@ -101,7 +101,7 @@ All packages are at `0.1.0`. Bump to `1.0.0` for the publish since this marks th
 
 ## Part 2: Integration Refactoring
 
-Once `@agent-runtime/connector` is published as an npm package (see `ELIZAOS-INTEGRATION-HANDOFF.md` in the agent-runtime repo), agent-society needs to consume it directly instead of via HTTP.
+Once `@agent-runtime/connector` is published as an npm package (see `ELIZAOS-INTEGRATION-HANDOFF.md` in the agent-runtime repo), crosstown needs to consume it directly instead of via HTTP.
 
 ### 2.1 Replace HTTP Client with Direct Import
 
@@ -172,9 +172,9 @@ Add a composition function in core that wires everything together:
 ```typescript
 // packages/core/src/compose.ts (new file)
 import { ConnectorNode } from '@agent-runtime/connector';
-import { BusinessLogicServer } from '@agent-society/bls';
+import { BusinessLogicServer } from '@crosstown/bls';
 
-export interface AgentSocietyNode {
+export interface CrosstownNode {
   connector: ConnectorNode;
   bls: BusinessLogicServer;
   bootstrap: BootstrapService;
@@ -187,7 +187,7 @@ export interface AgentSocietyNode {
   stop(): Promise<void>;
 }
 
-export function createAgentSocietyNode(config: AgentSocietyConfig): AgentSocietyNode {
+export function createCrosstownNode(config: CrosstownConfig): CrosstownNode {
   // 1. Create connector
   const connector = new ConnectorNode({
     nodeId: config.nodeId,
@@ -246,7 +246,7 @@ export function createAgentSocietyNode(config: AgentSocietyConfig): AgentSociety
 
 ```typescript
 // packages/core/src/index.ts — add new exports
-export { createAgentSocietyNode, type AgentSocietyNode, type AgentSocietyConfig } from './compose.js';
+export { createCrosstownNode, type CrosstownNode, type CrosstownConfig } from './compose.js';
 export { createDirectRuntimeClient, createHttpRuntimeClient } from './bootstrap/agent-runtime-client.js';
 
 // Re-export connector types for convenience
@@ -257,7 +257,7 @@ export type { ConnectorNode, ConnectorConfig } from '@agent-runtime/connector';
 
 ## Part 3: Create ElizaOS Plugin
 
-New package: `@agent-society/elizaos-plugin`
+New package: `@crosstown/elizaos-plugin`
 
 ### 3.1 Package Structure
 
@@ -270,7 +270,7 @@ packages/elizaos-plugin/
 ├── src/
 │   ├── index.ts                    ← plugin entry point
 │   ├── services/
-│   │   └── AgentSocietyService.ts  ← wraps createAgentSocietyNode()
+│   │   └── CrosstownService.ts  ← wraps createCrosstownNode()
 │   ├── actions/
 │   │   ├── pay.ts                  ← "Pay Alice 5 USD"
 │   │   ├── discoverPeers.ts        ← "Find new payment peers"
@@ -294,9 +294,9 @@ packages/elizaos-plugin/
 
 ```jsonc
 {
-  "name": "@agent-society/elizaos-plugin",
+  "name": "@crosstown/elizaos-plugin",
   "version": "1.0.0",
-  "description": "ElizaOS plugin for Agent Society — ILP payments via Nostr social graph",
+  "description": "ElizaOS plugin for Crosstown — ILP payments via Nostr social graph",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -310,8 +310,8 @@ packages/elizaos-plugin/
     "access": "public"
   },
   "dependencies": {
-    "@agent-society/core": "^1.0.0",
-    "@agent-society/bls": "^1.0.0"
+    "@crosstown/core": "^1.0.0",
+    "@crosstown/bls": "^1.0.0"
   },
   "peerDependencies": {
     "@elizaos/core": "^1.0.0"
@@ -325,7 +325,7 @@ packages/elizaos-plugin/
 ```typescript
 // src/index.ts
 import type { Plugin } from '@elizaos/core';
-import { AgentSocietyService } from './services/AgentSocietyService.js';
+import { CrosstownService } from './services/CrosstownService.js';
 import { payAction } from './actions/pay.js';
 import { discoverPeersAction } from './actions/discoverPeers.js';
 import { checkTrustAction } from './actions/checkTrust.js';
@@ -340,11 +340,11 @@ import { paymentHistoryProvider } from './providers/paymentHistory.js';
 import { paymentOutcomeEvaluator } from './evaluators/paymentOutcome.js';
 import { trustEvolutionEvaluator } from './evaluators/trustEvolution.js';
 
-export const agentSocietyPlugin: Plugin = {
-  name: '@agent-society/elizaos-plugin',
+export const crosstownPlugin: Plugin = {
+  name: '@crosstown/elizaos-plugin',
   description: 'ILP payments via Nostr social graph',
 
-  services: [AgentSocietyService],
+  services: [CrosstownService],
 
   actions: [
     payAction,
@@ -376,36 +376,36 @@ export const agentSocietyPlugin: Plugin = {
   ],
 };
 
-export default agentSocietyPlugin;
+export default crosstownPlugin;
 ```
 
 ### 3.4 Service Implementation
 
 ```typescript
-// src/services/AgentSocietyService.ts
+// src/services/CrosstownService.ts
 import { Service, type IAgentRuntime } from '@elizaos/core';
-import { createAgentSocietyNode, type AgentSocietyNode } from '@agent-society/core';
+import { createCrosstownNode, type CrosstownNode } from '@crosstown/core';
 
-export class AgentSocietyService extends Service {
-  static serviceType = 'agent_society' as const;
+export class CrosstownService extends Service {
+  static serviceType = 'crosstown' as const;
   capabilityDescription = 'Manages ILP connector, Nostr identity, peer discovery, and trust';
 
-  private node!: AgentSocietyNode;
+  private node!: CrosstownNode;
 
-  static async start(runtime: IAgentRuntime): Promise<AgentSocietyService> {
-    const service = new AgentSocietyService(runtime);
+  static async start(runtime: IAgentRuntime): Promise<CrosstownService> {
+    const service = new CrosstownService(runtime);
 
-    const nostrKey = runtime.getSetting('AGENT_SOCIETY_NOSTR_PRIVATE_KEY');
-    if (!nostrKey) throw new Error('AGENT_SOCIETY_NOSTR_PRIVATE_KEY required in character secrets');
+    const nostrKey = runtime.getSetting('CROSSTOWN_NOSTR_PRIVATE_KEY');
+    if (!nostrKey) throw new Error('CROSSTOWN_NOSTR_PRIVATE_KEY required in character secrets');
 
-    service.node = createAgentSocietyNode({
+    service.node = createCrosstownNode({
       nodeId: runtime.character.name,
       btpPort: Number(runtime.getSetting('BTP_PORT') || 7768),
       relayPort: Number(runtime.getSetting('RELAY_PORT') || 7100),
-      ilpAddress: runtime.getSetting('AGENT_SOCIETY_ILP_ADDRESS') as string,
+      ilpAddress: runtime.getSetting('CROSSTOWN_ILP_ADDRESS') as string,
       secretKey: nostrKey as string,
-      relays: (runtime.getSetting('AGENT_SOCIETY_RELAYS') as string)?.split(',') || [],
-      autoBootstrap: runtime.getSetting('AGENT_SOCIETY_AUTO_BOOTSTRAP') !== 'false',
+      relays: (runtime.getSetting('CROSSTOWN_RELAYS') as string)?.split(',') || [],
+      autoBootstrap: runtime.getSetting('CROSSTOWN_AUTO_BOOTSTRAP') !== 'false',
     });
 
     await service.node.start();
@@ -417,7 +417,7 @@ export class AgentSocietyService extends Service {
   }
 
   // Accessors for Actions and Providers
-  getNode(): AgentSocietyNode { return this.node; }
+  getNode(): CrosstownNode { return this.node; }
   getConnector() { return this.node.connector; }
   getTrustManager() { return this.node.trustManager; }
   getSpspClient() { return this.node.spspClient; }
@@ -434,18 +434,18 @@ With the plugin published, an agent operator's entire config is one character fi
 ```jsonc
 {
   "name": "PaymentAgent",
-  "plugins": ["@agent-society/elizaos-plugin"],
+  "plugins": ["@crosstown/elizaos-plugin"],
   "settings": {
-    "AGENT_SOCIETY_ILP_ADDRESS": "g.agent.payment-agent",
+    "CROSSTOWN_ILP_ADDRESS": "g.agent.payment-agent",
     "BTP_PORT": "7768",
     "RELAY_PORT": "7100",
-    "AGENT_SOCIETY_RELAYS": "wss://relay.damus.io,wss://relay.nostr.band",
-    "AGENT_SOCIETY_AUTO_BOOTSTRAP": "true",
-    "AGENT_SOCIETY_TRUST_THRESHOLD": "0.5",
-    "AGENT_SOCIETY_MAX_PAYMENT": "100"
+    "CROSSTOWN_RELAYS": "wss://relay.damus.io,wss://relay.nostr.band",
+    "CROSSTOWN_AUTO_BOOTSTRAP": "true",
+    "CROSSTOWN_TRUST_THRESHOLD": "0.5",
+    "CROSSTOWN_MAX_PAYMENT": "100"
   },
   "secrets": {
-    "AGENT_SOCIETY_NOSTR_PRIVATE_KEY": "<hex-encoded-nostr-private-key>"
+    "CROSSTOWN_NOSTR_PRIVATE_KEY": "<hex-encoded-nostr-private-key>"
   }
 }
 ```
@@ -456,7 +456,7 @@ No YAML config. No Docker compose. No multiple processes. One file, one process.
 
 ## Summary: All Work Items
 
-### agent-society — Publish Existing Packages
+### crosstown — Publish Existing Packages
 
 | # | Task | Package | Effort |
 |---|------|---------|--------|
@@ -467,22 +467,22 @@ No YAML config. No Docker compose. No multiple processes. One file, one process.
 | 5 | `npm pack` each package and verify contents | core, bls, relay | S |
 | 6 | Publish to npm in order: bls → core → relay | core, bls, relay | S |
 
-### agent-society — Integration Refactoring
+### crosstown — Integration Refactoring
 
 | # | Task | Package | Effort |
 |---|------|---------|--------|
 | 7 | Add `@agent-runtime/connector` as dependency | core | S |
 | 8 | Create `createDirectRuntimeClient()` (in-process alternative to HTTP) | core | M |
 | 9 | Make `BusinessLogicServer.handlePacket()` public | bls | S |
-| 10 | Create `createAgentSocietyNode()` composition function | core | M |
+| 10 | Create `createCrosstownNode()` composition function | core | M |
 | 11 | Update core exports | core | S |
 
-### agent-society — New ElizaOS Plugin
+### crosstown — New ElizaOS Plugin
 
 | # | Task | Package | Effort |
 |---|------|---------|--------|
 | 12 | Create package scaffolding | elizaos-plugin | S |
-| 13 | Implement AgentSocietyService | elizaos-plugin | M |
+| 13 | Implement CrosstownService | elizaos-plugin | M |
 | 14 | Implement PAY action | elizaos-plugin | L |
 | 15 | Implement DISCOVER_PEERS, CHECK_TRUST, BOOTSTRAP_NETWORK actions | elizaos-plugin | M |
 | 16 | Implement trustScore, peerStatus, ilpBalance providers | elizaos-plugin | M |
@@ -500,20 +500,20 @@ agent-runtime refactoring (separate handoff)
 Publish @agent-runtime/shared + @agent-runtime/connector to npm
         │
         ▼
-Tasks 1-6: Publish @agent-society/bls, core, relay to npm
+Tasks 1-6: Publish @crosstown/bls, core, relay to npm
         │
         ▼
 Tasks 7-11: Integration refactoring (core imports connector directly)
         │
         ▼
-Tasks 12-20: Build and publish @agent-society/elizaos-plugin
+Tasks 12-20: Build and publish @crosstown/elizaos-plugin
 ```
 
 ---
 
 ## Reference: Existing Public APIs
 
-### @agent-society/core exports
+### @crosstown/core exports
 
 ```
 BootstrapService, createAgentRuntimeClient, RelayMonitor
@@ -522,11 +522,11 @@ NostrSpspClient, NostrSpspServer, IlpSpspClient
 SocialTrustManager, calculateCreditLimit
 buildIlpPeerInfoEvent, parseIlpPeerInfo, buildSpspRequestEvent, parseSpspResponse
 ILP_PEER_INFO_KIND, SPSP_REQUEST_KIND, SPSP_RESPONSE_KIND
-AgentSocietyError, PeerDiscoveryError, SpspError, TrustError, BootstrapError
+CrosstownError, PeerDiscoveryError, SpspError, TrustError, BootstrapError
 + all types (IlpPeerInfo, SpspInfo, TrustScore, TrustConfig, etc.)
 ```
 
-### @agent-society/bls exports
+### @crosstown/bls exports
 
 ```
 createBlsServer, BusinessLogicServer
@@ -537,7 +537,7 @@ BlsBaseError, BlsError, ToonEncodeError
 + all types (BlsConfig, HandlePacketRequest/Response, EventStore, etc.)
 ```
 
-### @agent-society/relay exports
+### @crosstown/relay exports
 
 ```
 NostrRelayServer, ConnectionHandler
