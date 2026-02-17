@@ -30,7 +30,7 @@ Crosstown is an ILP-gated Nostr relay. It bridges Nostr and Interledger Protocol
 │                                                             │
 │  - Nostr relay (NIP-01 WebSocket)                           │
 │  - BLS validates ILP payments, stores events                │
-│  - TOON encoding: binary Nostr events as ILP packet data    │
+│  - TOON-native: events stored and served in TOON format     │
 │  - Pay to write, free to read                               │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -65,6 +65,12 @@ The Nostr layer is for discovery and configuration. Actual packet routing uses l
 
 ### Pay to Write, Free to Read
 The relay gates EVENT writes with ILP micropayments, solving the relay sustainability problem. Reading via REQ/EVENT/EOSE is free.
+
+### TOON-Native
+Events are encoded in [TOON format](https://github.com/nicholasgasior/toon) throughout the stack — written as TOON in ILP packets, stored as TOON in the event store, and returned as TOON from the relay. TOON is the native wire format, designed for agent digestion rather than human readability.
+
+### Discovery ≠ Peering
+The RelayMonitor discovers new peers (kind:10032) and emits events, but does **not** automatically initiate peering. The `CrosstownNode` exposes `peerWith()` as a method so the caller can decide when and whether to peer. Discovery is passive observation; peering is an explicit decision.
 
 ## Development Guidelines
 
