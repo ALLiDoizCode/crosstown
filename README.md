@@ -1,8 +1,8 @@
 # Crosstown
 
-Nostr-native peer discovery and ILP payment routing for autonomous agents.
+A Nostr relay that solves the relay business model by also being an ILP connector that gates writes with micropayments.
 
-Agents publish their ILP connector info as Nostr events, discover each other through relays, negotiate settlement chains via encrypted SPSP handshakes, and open payment channels -- all without manual configuration.
+Nodes publish their ILP connector info as Nostr events, discover each other through relays, negotiate settlement chains via encrypted SPSP handshakes, and open payment channels -- all without manual configuration.
 
 ## The Protocol
 
@@ -10,11 +10,11 @@ Three Nostr event kinds power the entire peering lifecycle:
 
 | Kind | Name | What it does |
 |------|------|-------------|
-| **10032** | ILP Peer Info | Replaceable event advertising an agent's ILP address, settlement chains, and token preferences |
+| **10032** | ILP Peer Info | Replaceable event advertising a node's ILP address, settlement chains, and token preferences |
 | **23194** | SPSP Request | NIP-44 encrypted request to negotiate a payment channel (sent as ILP packet data) |
 | **23195** | SPSP Response | NIP-44 encrypted response containing the negotiated chain, settlement address, and channel ID |
 
-A new agent joins the network in three phases:
+A new node joins the network in three phases:
 
 ```
 Joiner                                    Genesis (accepts free SPSP)
@@ -41,7 +41,7 @@ After bootstrap, a **RelayMonitor** watches the relay for new kind:10032 events 
 
 | Package | Purpose |
 |---------|---------|
-| [`@crosstown/core`](packages/core) | Peer discovery, SPSP handshakes, settlement negotiation, trust scoring, and the `createCrosstownNode()` composition API |
+| [`@crosstown/core`](packages/core) | Peer discovery, SPSP handshakes, settlement negotiation, and the `createCrosstownNode()` composition API |
 | [`@crosstown/relay`](packages/relay) | Nostr relay with ILP payment gating -- pay to write, free to read |
 | [`@crosstown/bls`](packages/bls) | Business Logic Server -- validates ILP payments and stores Nostr events |
 | [`@crosstown/examples`](packages/examples) | Demo scripts for the ILP-gated relay |
@@ -128,7 +128,7 @@ The relay is a standard Nostr relay with one addition: **writing costs a micropa
 
 ## Settlement
 
-Agents negotiate settlement on-chain during the SPSP handshake:
+Nodes negotiate settlement on-chain during the SPSP handshake:
 
 1. Both sides advertise supported chains (e.g., `evm:base:84532`)
 2. `negotiateSettlementChain()` finds the best chain intersection
@@ -146,15 +146,6 @@ Peers are discovered from multiple sources:
 2. **ArDrive registry** -- peer list stored on Arweave
 3. **Environment variable** -- `ADDITIONAL_PEERS` JSON
 4. **Relay monitor** -- watches relay for new kind:10032 events in real-time
-
-## Trust
-
-Social distance in the Nostr follow graph determines credit limits:
-
-- **Direct follow** -- highest trust, largest credit limit
-- **2 hops** -- moderate trust
-- **3+ hops** -- low or zero trust
-- **Mutual follows** and **zap reputation** (NIP-57) increase trust scores
 
 ## Quick Start
 
