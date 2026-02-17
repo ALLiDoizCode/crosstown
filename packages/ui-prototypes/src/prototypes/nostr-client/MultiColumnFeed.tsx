@@ -27,7 +27,7 @@ export default function MultiColumnFeed() {
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 rounded-full bg-purple-600 flex items-center justify-center text-xs font-bold">AS</div>
-          <span className="font-semibold text-sm">Agent Society</span>
+          <span className="font-semibold text-sm">Crosstown</span>
           <Badge variant="outline" className="text-[10px]">Nostr Client</Badge>
         </div>
         <div className="flex items-center gap-2">

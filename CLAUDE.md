@@ -1,4 +1,4 @@
-# Agent Society Protocol
+# Crosstown Protocol
 
 A Nostr-based protocol for Interledger peer discovery, SPSP handshakes, and social graph-informed payment routing.
 
@@ -25,7 +25,7 @@ This library bridges Nostr and Interledger Protocol (ILP), enabling:
                               │ uses
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              @agent-society/protocol (this library)          │
+│              @crosstown/protocol (this library)          │
 │                                                             │
 │  - NostrPeerDiscovery: NIP-02 → peer list                   │
 │  - NostrSpspClient: SPSP over Nostr events                  │

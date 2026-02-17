@@ -6,7 +6,7 @@
  * but for demo purposes this directly calls the BLS /handle-packet endpoint.
  */
 
-import { encodeEventToToon } from '@agent-society/relay';
+import { encodeEventToToon } from '@crosstown/relay';
 import type { NostrEvent } from 'nostr-tools/pure';
 
 /**
@@ -45,7 +45,7 @@ export class MockIlpConnector {
 
   constructor(config: MockConnectorConfig) {
     this.blsUrl = config.blsUrl;
-    this.destination = config.destination ?? 'g.agent-society.demo';
+    this.destination = config.destination ?? 'g.crosstown.demo';
   }
 
   /**

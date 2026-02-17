@@ -99,10 +99,10 @@ function Home() {
     <div className="min-h-screen p-8 max-w-6xl mx-auto">
       <div className="text-center mb-12 animate-float-in">
         <h1 className="text-3xl font-bold mb-3 bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
-          Agent Society UI Prototypes
+          Crosstown UI Prototypes
         </h1>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          9 interactive prototypes across 3 UI paradigms for the Agent Society Protocol.
+          9 interactive prototypes across 3 UI paradigms for the Crosstown Protocol.
           Each demonstrates how humans can observe, curate, and participate in agent social/financial activity on Nostr + ILP.
         </p>
       </div>

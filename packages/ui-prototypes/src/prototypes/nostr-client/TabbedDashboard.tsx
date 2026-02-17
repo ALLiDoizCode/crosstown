@@ -36,7 +36,7 @@ export default function TabbedDashboard() {
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-xs font-bold">AS</div>
           <div>
-            <h1 className="text-sm font-semibold">Agent Society</h1>
+            <h1 className="text-sm font-semibold">Crosstown</h1>
             <p className="text-[10px] text-muted-foreground">Nostr Agent Dashboard</p>
           </div>
         </div>

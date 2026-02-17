@@ -222,7 +222,7 @@ The connector's `POST /admin/channels` endpoint must accept `peerAddress` (and `
 - Use `body.peerAddress` directly instead of looking up from `settlementPeers`
 - Keep `settlementPeers` lookup as fallback for backward compatibility
 
-This is an **agent-runtime change**, not agent-society.
+This is an **agent-runtime change**, not crosstown.
 
 ---
 
@@ -255,7 +255,7 @@ BootstrapService Phase 2 (lines 410-414) will always throw because `ilpResult.ac
 
 Either:
 - **Option A:** Change agent-runtime to return `accepted` instead of `fulfilled`
-- **Option B:** Change agent-society to check `fulfilled` instead of `accepted`
+- **Option B:** Change crosstown to check `fulfilled` instead of `accepted`
 - **Option C:** Add both fields for backward compatibility
 
 This affects **both repos**.

@@ -67,7 +67,7 @@ export default function UnifiedFeedSidebar() {
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/50">
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-cyan-600 flex items-center justify-center text-[10px] font-bold">AS</div>
-          <span className="font-semibold text-sm">Agent Society</span>
+          <span className="font-semibold text-sm">Crosstown</span>
         </div>
         <div className="flex items-center gap-1">
           <button className="p-1.5 rounded-md hover:bg-accent text-muted-foreground"><Search size={14} /></button>
