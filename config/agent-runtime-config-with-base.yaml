@@ -1,0 +1,57 @@
+# Agent-Runtime Connector Configuration
+# With BASE Blockchain for Payment Channels
+
+nodeId: crosstown-node
+btpServerPort: 3000
+healthCheckPort: 8080
+logLevel: info
+
+# Initially empty - peers will be registered dynamically via admin API
+peers: []
+
+# Initially empty - routes will be added when peers are registered
+routes: []
+
+# Local delivery to Crosstown BLS
+localDelivery:
+  enabled: true
+  url: http://crosstown:3100
+  timeout: 30000
+
+# Admin API configuration
+adminApi:
+  enabled: true
+  port: 8081
+
+# Explorer UI
+explorer:
+  enabled: true
+  port: 3001
+  retentionDays: 7
+  maxEvents: 1000000
+
+# Settlement configuration
+settlement:
+  enabled: true
+  engine: memory
+  # Payment channels will use in-memory settlement tracking
+
+# Settlement infrastructure - ENABLED for payment channels
+settlementInfra:
+  enabled: true
+  # BASE blockchain configuration will be loaded from environment:
+  # - BASE_ENABLED=true
+  # - BASE_RPC_URL=http://anvil:8545
+  # - BASE_CHAIN_ID=31337
+  # - BASE_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+
+# Security configuration
+security:
+  rateLimit:
+    enabled: true
+    maxRequestsPerMinute: 100
+
+# Performance tuning
+performance:
+  maxConcurrentPackets: 100
+  packetTimeout: 30000
