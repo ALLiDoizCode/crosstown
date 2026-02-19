@@ -1,6 +1,6 @@
 {
   "name": "@crosstown/examples",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Example applications for crosstown protocol",
   "type": "module",
