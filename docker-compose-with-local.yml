@@ -1,0 +1,258 @@
+# Crosstown + Connector + Anvil (Local Development Stack)
+# Complete local development environment with:
+# - Anvil (local Ethereum blockchain)
+# - Auto-deployed payment channel contracts
+# - Forgejo (ILP-gated Git hosting)
+# - Pre-funded test wallets
+#
+# This mirrors docker-compose-testnet.yml but runs entirely locally with no external dependencies.
+
+version: '3.8'
+
+networks:
+  crosstown-network:
+    driver: bridge
+
+volumes:
+  crosstown-data:
+  connector-data:
+  forgejo-data:
+
+services:
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Anvil - Local Ethereum Node for Payment Channels
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: crosstown-anvil
+    command: >
+      anvil
+      --host 0.0.0.0
+      --port 8545
+      --chain-id 31337
+      --accounts 10
+      --balance 10000
+    ports:
+      - "8545:8545"
+    networks:
+      - crosstown-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "cast client --rpc-url http://localhost:8545 2>&1 | grep -q 'anvil' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Contract Deployer - Deploys payment channel contracts to Anvil
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  contract-deployer:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: crosstown-contract-deployer
+    working_dir: /contracts
+    environment:
+      BASE_RPC_URL: http://anvil:8545
+    volumes:
+      - ../connector/packages/contracts:/contracts:ro
+    networks:
+      - crosstown-network
+    depends_on:
+      anvil:
+        condition: service_healthy
+    command: >
+      sh -c '
+        echo "Deploying contracts to local Anvil...";
+        forge script script/DeployLocal.s.sol --rpc-url http://anvil:8545 --broadcast;
+        echo "Contracts deployed successfully!";
+        echo "====================================";
+        echo "Contract addresses saved to broadcast/";
+        echo "====================================";
+      '
+    restart: "no"
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Connector - ILP Packet Routing + Payment Channels
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  connector:
+    image: connector:patched
+    container_name: crosstown-connector
+    environment:
+      # Environment mode
+      ENVIRONMENT: development
+
+      # Local delivery to Crosstown BLS
+      LOCAL_DELIVERY_URL: http://crosstown:3100
+
+      # Enable BASE blockchain for payment channels
+      BASE_ENABLED: "true"
+      BASE_RPC_URL: http://anvil:8545
+      BASE_CHAIN_ID: "31337"
+
+      # Anvil test account #0 private key (well-known)
+      BASE_PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+
+      # Payment channel contract addresses (deployed by contract-deployer)
+      # After first run, check logs: docker compose -f docker-compose-with-local.yml logs contract-deployer
+      # Look for: AGENT_TOKEN_ADDRESS and TOKEN_NETWORK_ADDRESS
+      # Then set these env vars and restart
+      BASE_TOKEN_ADDRESS: ${BASE_TOKEN_ADDRESS:-}
+      BASE_REGISTRY_ADDRESS: ${BASE_REGISTRY_ADDRESS:-}
+
+      # Optional: Enable Explorer UI
+      EXPLORER_ENABLED: ${EXPLORER_ENABLED:-true}
+
+    ports:
+      - "3000:3000"   # BTP Server
+      - "8080:8080"   # Health check
+      - "8081:8081"   # Admin API
+      - "3001:3001"   # Explorer UI
+    volumes:
+      - connector-data:/data
+      - ./config/connector-config-with-base.yaml:/app/config.yaml:ro
+    networks:
+      - crosstown-network
+    depends_on:
+      anvil:
+        condition: service_healthy
+      contract-deployer:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Crosstown Full Node - BLS + Nostr Relay + Bootstrap
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  crosstown:
+    image: crosstown:optimized
+    container_name: crosstown-node
+    environment:
+      # Required Configuration
+      NODE_ID: ${NODE_ID:-my-crosstown-node}
+      NOSTR_SECRET_KEY: ${NOSTR_SECRET_KEY}
+      ILP_ADDRESS: ${ILP_ADDRESS:-g.crosstown.my-node}
+
+      # Connector Integration (External Mode via HTTP)
+      CONNECTOR_ADMIN_URL: http://connector:8081
+      CONNECTOR_URL: http://connector:8080
+      BTP_ENDPOINT: ${BTP_ENDPOINT:-ws://connector:3000}
+
+      # Service Ports
+      BLS_PORT: 3100
+      WS_PORT: 7100
+
+      # Pricing
+      BASE_PRICE_PER_BYTE: ${BASE_PRICE_PER_BYTE:-10}
+      SPSP_MIN_PRICE: ${SPSP_MIN_PRICE:-5}
+
+      # Asset
+      ASSET_CODE: ${ASSET_CODE:-USD}
+      ASSET_SCALE: ${ASSET_SCALE:-6}
+
+      # Bootstrap
+      ARDRIVE_ENABLED: ${ARDRIVE_ENABLED:-true}
+
+      # Storage
+      DATA_DIR: /data
+
+    ports:
+      - "3100:3100"   # BLS HTTP API
+      - "7100:7100"   # Nostr Relay WebSocket
+    volumes:
+      - crosstown-data:/data
+    networks:
+      - crosstown-network
+    depends_on:
+      connector:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3100/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Forgejo - ILP-Gated Git Infrastructure
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:14
+    container_name: crosstown-forgejo
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - FORGEJO__database__DB_TYPE=sqlite3
+      - FORGEJO__server__DOMAIN=localhost
+      - FORGEJO__server__HTTP_PORT=3000
+      - FORGEJO__server__ROOT_URL=http://localhost:3003/
+      - FORGEJO__security__INSTALL_LOCK=true
+    ports:
+      - "3003:3000"   # Web UI (HTTP)
+      - "2222:22"     # Git over SSH
+    volumes:
+      - forgejo-data:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - crosstown-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Quick Start Guide
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#
+# 1. Start the stack:
+#    docker compose -f docker-compose-with-local.yml up -d
+#
+# 2. Get deployed contract addresses:
+#    docker compose -f docker-compose-with-local.yml logs contract-deployer | grep "deployed to"
+#
+# 3. Optional: Set contract addresses in .env:
+#    BASE_TOKEN_ADDRESS=0x...
+#    BASE_REGISTRY_ADDRESS=0x...
+#
+# 4. Access services:
+#    - Anvil RPC:         http://localhost:8545
+#    - Connector Health:  http://localhost:8080/health
+#    - Explorer UI:       http://localhost:3001
+#    - Crosstown BLS:     http://localhost:3100
+#    - Nostr Relay:       ws://localhost:7100
+#    - Forgejo Web UI:    http://localhost:3003
+#
+# 5. Test accounts (all pre-funded with 10000 ETH by Anvil):
+#    Account 0 (Deployer - holds all 1M AGENT tokens initially):
+#      Address:  0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+#      Private:  0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+#
+#    Account 1:
+#      Address:  0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+#      Private:  0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+#
+#    Account 2:
+#      Address:  0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+#      Private:  0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
+#
+# 6. Transfer AGENT tokens to other accounts (tokens can't be minted, only transferred):
+#    Get token address from deployment logs first, then:
+#
+#    cast send <TOKEN_ADDRESS> "transfer(address,uint256)" <RECIPIENT_ADDRESS> 100000000000000000000000 \
+#      --rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+#
+# 7. Check AGENT token balance:
+#    cast call <TOKEN_ADDRESS> "balanceOf(address)(uint256)" <ADDRESS> --rpc-url http://localhost:8545
+#
+# 8. Stop the stack:
+#    docker compose -f docker-compose-with-local.yml down
+#

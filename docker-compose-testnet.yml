@@ -75,9 +75,9 @@ services:
       ILP_ADDRESS: ${ILP_ADDRESS:-g.crosstown.my-node}
 
       # Connector Integration (External Mode via HTTP)
-      CONNECTOR_ADMIN_URL: http://agent-runtime:8081
-      AGENT_RUNTIME_URL: http://agent-runtime:8080
-      BTP_ENDPOINT: ${BTP_ENDPOINT:-ws://agent-runtime:3000}
+      CONNECTOR_ADMIN_URL: http://connector:8081
+      CONNECTOR_URL: http://connector:8080
+      BTP_ENDPOINT: ${BTP_ENDPOINT:-ws://connector:3000}
 
       # Service Ports
       BLS_PORT: 3100

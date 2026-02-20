@@ -3,7 +3,7 @@
 # Architecture:
 #   TigerBeetle (settlement DB)
 #      ↓
-#   Agent-Runtime Connector (ILP routing, packet forwarding)
+#   Connector (ILP routing, packet forwarding)
 #      ↓
 #   Crosstown Full Node (BLS + Relay + Bootstrap)
 #
@@ -15,7 +15,7 @@
 #
 #   2. Build images:
 #      docker build -f docker/Dockerfile -t crosstown:latest .
-#      cd ../agent-runtime && docker build -t agent-runtime:latest .
+#      cd ../connector && docker build -t connector:latest .
 #      cd ../crosstown
 #
 #   3. Start stack:
@@ -69,11 +69,11 @@ services:
       start_period: 10s
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  # Agent-Runtime Connector - ILP Packet Routing
+  # Connector - ILP Packet Routing
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  agent-runtime:
-    image: agent-runtime:latest
-    container_name: crosstown-agent-runtime
+  connector:
+    image: connector:patched
+    container_name: crosstown-connector
     environment:
       # Connector Identity
       NODE_ID: ${NODE_ID:-crosstown-node}
@@ -131,9 +131,9 @@ services:
       # ──────────────────────────────────────────────────────────────
       # Connector Integration (External Mode via HTTP)
       # ──────────────────────────────────────────────────────────────
-      CONNECTOR_ADMIN_URL: http://agent-runtime:8081
-      AGENT_RUNTIME_URL: http://agent-runtime:3100
-      BTP_ENDPOINT: ${BTP_ENDPOINT:-ws://crosstown-node:3000}
+      CONNECTOR_ADMIN_URL: http://connector:8081
+      CONNECTOR_URL: http://connector:8080
+      BTP_ENDPOINT: ${BTP_ENDPOINT:-ws://connector:3000}
 
       # ──────────────────────────────────────────────────────────────
       # Service Ports
@@ -188,7 +188,7 @@ services:
     networks:
       - crosstown-network
     depends_on:
-      agent-runtime:
+      connector:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -239,7 +239,7 @@ services:
 #
 # Check individual service health:
 #
-#   curl http://localhost:8080/health  # Agent-Runtime
+#   curl http://localhost:8080/health  # Connector
 #   curl http://localhost:3100/health  # Crosstown BLS
 #   curl http://localhost:3003/       # Forgejo Web UI
 #
@@ -251,6 +251,6 @@ services:
 # Monitor logs:
 #
 #   docker compose -f docker-compose-full-stack.yml logs -f crosstown
-#   docker compose -f docker-compose-full-stack.yml logs -f agent-runtime
+#   docker compose -f docker-compose-full-stack.yml logs -f connector
 #   docker compose -f docker-compose-full-stack.yml logs -f forgejo
 #
