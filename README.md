@@ -95,6 +95,7 @@ Crosstown is a monorepo with four packages:
 | **[@crosstown/core](packages/core)** | Discovery & peering foundation | `createCrosstownNode()`, `BootstrapService`, `RelayMonitor`, SPSP client/server, settlement negotiation |
 | **[@crosstown/relay](packages/relay)** | Nostr relay WebSocket server | `NostrRelayServer`, `EventStore`, TOON encoding, upstream relay propagation via `RelaySubscriber` |
 | **[@crosstown/bls](packages/bls)** | Standalone Business Logic Server | `createBlsServer()` — HTTP server that validates ILP payments and stores events |
+| **[@crosstown/faucet](packages/faucet)** | Token distribution service | Web-based faucet for distributing test ETH and AGENT tokens to developers |
 | **[@crosstown/examples](packages/examples)** | Working demos | `ilp-gated-relay-demo` showing the full stack in action |
 
 **Package Relationships:**
@@ -413,6 +414,53 @@ pnpm demo:ilp-gated-relay
 3. Joiner discovers genesis via relay subscription
 4. Joiner handshakes with genesis (kind:23194/23195)
 5. Joiner announces itself by paying to write its own kind:10032 event
+
+### Local Development Stack (Recommended)
+
+The easiest way to develop with Crosstown — includes everything you need:
+
+```bash
+# Start full local stack: Anvil + Connector + Crosstown + Faucet + Forgejo
+docker compose -f docker-compose-with-local.yml up -d
+
+# Get test tokens instantly from the faucet
+open http://localhost:3500
+```
+
+**What you get:**
+
+| Service | URL | Purpose |
+|---------|-----|---------|
+| **🚰 Token Faucet** | http://localhost:3500 | Get 100 ETH + 10,000 AGENT tokens instantly |
+| **⚡ Anvil** | http://localhost:8545 | Local Ethereum blockchain (chain ID 31337) |
+| **🔗 Connector** | http://localhost:8080 | ILP packet routing (v1.19.1) |
+| **📊 Explorer UI** | http://localhost:3001 | Monitor ILP packets and balances |
+| **📡 Crosstown BLS** | http://localhost:3100 | Payment validation & event storage |
+| **🌐 Nostr Relay** | ws://localhost:7100 | Read events for free |
+| **🦊 Forgejo** | http://localhost:3003 | ILP-gated Git hosting |
+
+**Quick workflow:**
+1. **Get tokens** → Visit faucet, enter your address, receive tokens
+2. **Deploy contracts** → Automatically deployed on startup
+3. **Test payments** → Send ILP packets through the connector
+4. **Store events** → Pay to write Nostr events to the relay
+5. **Read for free** → Query events via WebSocket
+
+**Token Faucet Features:**
+- Distributes **100 ETH** and **10,000 AGENT tokens** per request
+- **Rate limited** to 1 request per address per hour
+- **Auto-discovery** of deployed contract addresses
+- **Beautiful web UI** with real-time balance tracking
+- **RESTful API** for programmatic access
+
+**Deployed Contracts (Local Anvil):**
+- **AGENT Token** (ERC20): Mock token for testing payment channels
+- **TokenNetwork**: Payment channel registry for off-chain transfers
+
+**Stop the stack:**
+```bash
+docker compose -f docker-compose-with-local.yml down
+```
 
 ### Docker Deployment (Standalone Mode)
 
