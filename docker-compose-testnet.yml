@@ -1,4 +1,4 @@
-# Crosstown + Agent-Runtime with Base Sepolia Testnet
+# Crosstown + Connector with Base Sepolia Testnet
 # Full Payment Channel Testing with Deployed Contracts
 #
 # Uses deployed payment channel contracts on Base Sepolia testnet
@@ -12,14 +12,15 @@ networks:
 
 volumes:
   crosstown-data:
-  agent-runtime-data:
+  connector-data:
+  forgejo-data:
 
 services:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  # Connector (v1.19.0) - ILP Routing + Payment Channels
+  # Connector (v1.19.1) - ILP Routing + Payment Channels
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  agent-runtime:
-    image: connector:patched
+  connector:
+    image: connector:1.19.1
     container_name: crosstown-connector
     environment:
       # Environment mode - staging uses testnet
@@ -49,8 +50,8 @@ services:
       - "8081:8081"   # Admin API
       - "3001:3001"   # Explorer UI
     volumes:
-      - agent-runtime-data:/data
-      - ./config/agent-runtime-config-testnet.yaml:/app/config.yaml:ro
+      - connector-data:/data
+      - ./config/connector-config-testnet.yaml:/app/config.yaml:ro
     networks:
       - crosstown-network
     restart: unless-stopped
@@ -104,7 +105,7 @@ services:
     networks:
       - crosstown-network
     depends_on:
-      agent-runtime:
+      connector:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -113,3 +114,34 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Forgejo - ILP-Gated Git Infrastructure
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:14
+    container_name: crosstown-forgejo
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - FORGEJO__database__DB_TYPE=sqlite3
+      - FORGEJO__server__DOMAIN=localhost
+      - FORGEJO__server__HTTP_PORT=3000
+      - FORGEJO__server__ROOT_URL=http://localhost:3003/
+      - FORGEJO__security__INSTALL_LOCK=true
+    ports:
+      - "3003:3000"   # Web UI (HTTP)
+      - "2222:22"     # Git over SSH
+    volumes:
+      - forgejo-data:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - crosstown-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
