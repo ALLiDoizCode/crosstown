@@ -8,8 +8,9 @@ Crosstown is an ILP-gated Nostr relay. It bridges Nostr and Interledger Protocol
 
 1. **Peer Discovery via NIP-02**: Use Nostr follow lists to discover ILP peers
 2. **SPSP over Nostr**: Exchange SPSP parameters via Nostr events instead of HTTPS
-3. **ILP-Gated Writes**: Pay to write events, free to read — relay sustainability through micropayments
-4. **Decentralized Connector Registry**: Publish and discover connector info via relays
+3. **Payment Channels**: Automatic payment channel creation during bootstrap with settlement
+4. **ILP-Gated Writes**: Pay to write events, free to read — relay sustainability through micropayments
+5. **Decentralized Connector Registry**: Publish and discover connector info via relays
 
 ## Architecture
 
@@ -71,6 +72,37 @@ Events are encoded in [TOON format](https://github.com/nicholasgasior/toon) thro
 
 ### Discovery ≠ Peering
 The RelayMonitor discovers new peers (kind:10032) and emits events, but does **not** automatically initiate peering. The `CrosstownNode` exposes `peerWith()` as a method so the caller can decide when and whether to peer. Discovery is passive observation; peering is an explicit decision.
+
+### Payment Channels for Settlement
+The bootstrap flow automatically creates payment channels when settlement is enabled:
+- **SPSP Negotiation**: Exchange settlement parameters (chain, token, addresses) via SPSP
+- **TokenNetwork Integration**: Uses TokenNetworkRegistry to manage per-token payment channels
+- **Channel Opening**: Automatically opens channels with initial deposit during handshaking phase
+- **Off-chain Payments**: Peers exchange signed claims that can be settled on-chain
+- **Nonce Management**: Retry logic handles blockchain transaction conflicts gracefully
+
+## Testing
+
+### Bootstrap Flow Test
+Run the complete bootstrap flow with payment channels:
+```bash
+bash test-payment-channels.sh
+```
+
+This test:
+- Restarts Anvil for fresh blockchain state
+- Deploys TokenNetworkRegistry and AGENT token contracts
+- Funds peer wallets with tokens
+- Runs bootstrap test with settlement enabled
+- Verifies channel creation (expect `channelCount: 1`)
+
+### Verify On-Chain State
+Check payment channel state on blockchain:
+```bash
+bash verify-channel-state.sh
+```
+
+See `PAYMENT-CHANNELS-SUCCESS.md` for complete documentation.
 
 ## Development Guidelines
 
