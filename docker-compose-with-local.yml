@@ -7,8 +7,6 @@
 #
 # This mirrors docker-compose-testnet.yml but runs entirely locally with no external dependencies.
 
-version: '3.8'
-
 networks:
   crosstown-network:
     driver: bridge
@@ -26,7 +24,27 @@ services:
     image: ghcr.io/foundry-rs/foundry:latest
     container_name: crosstown-anvil
     entrypoint: []
-    command: ["anvil", "--host", "0.0.0.0", "--port", "8545", "--chain-id", "31337", "--accounts", "10", "--balance", "10000"]
+    command:
+      - sh
+      - -c
+      - |
+        echo "Starting Anvil..."
+        anvil --host 0.0.0.0 --port 8545 --chain-id 31337 --accounts 10 --balance 10000 &
+        ANVIL_PID=$$!
+
+        echo "Waiting for Anvil to be ready..."
+        until cast client --rpc-url http://localhost:8545 2>/dev/null | grep -q 'anvil'; do
+          sleep 1
+        done
+
+        echo "Deploying contracts..."
+        cd /contracts
+        forge script script/DeployLocal.s.sol:DeployLocalScript --rpc-url http://localhost:8545 --broadcast --skip-simulation || echo "Deployment failed (non-fatal)"
+
+        echo "Anvil ready with contracts deployed!"
+        wait $$ANVIL_PID
+    volumes:
+      - ../connector/packages/contracts:/contracts
     ports:
       - "8545:8545"
     networks:
@@ -37,34 +55,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 5s
+      start_period: 15s
 
-  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  # Contract Deployer - Deploys payment channel contracts to Anvil
-  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  contract-deployer:
-    image: ghcr.io/foundry-rs/foundry:latest
-    container_name: crosstown-contract-deployer
-    working_dir: /contracts
-    environment:
-      BASE_RPC_URL: http://anvil:8545
-    volumes:
-      - ../connector/packages/contracts:/contracts:ro
-    networks:
-      - crosstown-network
-    depends_on:
-      anvil:
-        condition: service_healthy
-    command: >
-      sh -c '
-        echo "Deploying contracts to local Anvil...";
-        forge script script/DeployLocal.s.sol --rpc-url http://anvil:8545 --broadcast;
-        echo "Contracts deployed successfully!";
-        echo "====================================";
-        echo "Contract addresses saved to broadcast/";
-        echo "====================================";
-      '
-    restart: "no"
+  # Contract deployer removed - Anvil now deploys contracts on startup via init script
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # Token Faucet - Provides ETH and AGENT tokens for testing
@@ -101,8 +94,6 @@ services:
     depends_on:
       anvil:
         condition: service_healthy
-      contract-deployer:
-        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3500/health || exit 1"]
@@ -133,11 +124,9 @@ services:
       BASE_PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
       # Payment channel contract addresses (deployed by contract-deployer)
-      # After first run, check logs: docker compose -f docker-compose-with-local.yml logs contract-deployer
-      # Look for: AGENT_TOKEN_ADDRESS and TOKEN_NETWORK_ADDRESS
-      # Then set these env vars and restart
-      BASE_TOKEN_ADDRESS: ${BASE_TOKEN_ADDRESS:-}
-      BASE_REGISTRY_ADDRESS: ${BASE_REGISTRY_ADDRESS:-}
+      # These are deterministic addresses from Anvil deployment
+      BASE_TOKEN_ADDRESS: ${BASE_TOKEN_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
+      BASE_REGISTRY_ADDRESS: ${BASE_REGISTRY_ADDRESS:-0xe7f1725e7734ce288f8367e1bb143e90bb3f0512}
 
       # Optional: Enable Explorer UI
       EXPLORER_ENABLED: ${EXPLORER_ENABLED:-true}
@@ -155,8 +144,6 @@ services:
     depends_on:
       anvil:
         condition: service_healthy
-      contract-deployer:
-        condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
@@ -194,8 +181,19 @@ services:
       ASSET_CODE: ${ASSET_CODE:-USD}
       ASSET_SCALE: ${ASSET_SCALE:-6}
 
-      # Bootstrap
+      # Bootstrap & Peer Discovery
+      BOOTSTRAP_RELAYS: ${BOOTSTRAP_RELAYS:-}
+      BOOTSTRAP_PEERS: ${BOOTSTRAP_PEERS:-}
       ARDRIVE_ENABLED: ${ARDRIVE_ENABLED:-true}
+
+      # Settlement (EVM/BASE)
+      PEER_EVM_ADDRESS: ${PEER_EVM_ADDRESS:-}
+      M2M_TOKEN_ADDRESS: ${M2M_TOKEN_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
+
+      # NIP-34 Git Integration (Forgejo)
+      FORGEJO_URL: ${FORGEJO_URL:-http://forgejo:3000}
+      FORGEJO_TOKEN: ${FORGEJO_TOKEN:-}
+      FORGEJO_OWNER: ${FORGEJO_OWNER:-crosstown}
 
       # Storage
       DATA_DIR: /data
@@ -219,7 +217,7 @@ services:
       start_period: 10s
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  # Forgejo - ILP-Gated Git Infrastructure
+  # Forgejo - Git Infrastructure (Web UI + Storage)
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   forgejo:
     image: codeberg.org/forgejo/forgejo:14
@@ -230,11 +228,21 @@ services:
       - FORGEJO__database__DB_TYPE=sqlite3
       - FORGEJO__server__DOMAIN=localhost
       - FORGEJO__server__HTTP_PORT=3000
-      - FORGEJO__server__ROOT_URL=http://localhost:3003/
+      - FORGEJO__server__ROOT_URL=http://localhost:3004/
       - FORGEJO__security__INSTALL_LOCK=true
+
+      # Git operations (git-proxy disabled, using direct access)
+      - FORGEJO__repository__DISABLE_HTTP_GIT=false  # Allow HTTP Git operations
+      - FORGEJO__repository__ENABLE_PUSH_CREATE_USER=false  # No auto-create on push
+      - FORGEJO__repository__ENABLE_PUSH_CREATE_ORG=false
+
+      # Web editor (enabled since git-proxy is disabled)
+      # Note: NIP-34 integration still provides payment-gated Git via Nostr events
+      - FORGEJO__repository__ENABLE_EDITOR_UPLOAD=true  # Allow file uploads via web
+      - FORGEJO__repository__DISABLE_DOWNLOAD_SOURCE_ARCHIVES=false  # Allow downloads
+
     ports:
-      - "3003:3000"   # Web UI (HTTP)
-      - "2222:22"     # Git over SSH
+      - "3004:3000"   # Web UI (direct access, free browsing)
     volumes:
       - forgejo-data:/data
       - /etc/timezone:/etc/timezone:ro
@@ -248,6 +256,44 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Git Proxy - DISABLED (Not ILP-spec compliant yet)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Temporarily disabled - needs to be redesigned to use ILP over HTTP (RFC-0035)
+  # See: https://interledger.org/developers/rfcs/ilp-over-http/
+  #
+  # git-proxy:
+  #   build:
+  #     context: .
+  #     dockerfile: packages/git-proxy/Dockerfile
+  #   container_name: crosstown-git-proxy
+  #   environment:
+  #     GIT_PROXY_PORT: 3002
+  #     FORGEJO_URL: http://forgejo:3000
+  #     BLS_URL: http://crosstown:3100
+  #     READ_PRICE: ${GIT_READ_PRICE:-100}
+  #     WRITE_PRICE: ${GIT_WRITE_PRICE:-1000}
+  #     PRICE_PER_KB: ${GIT_PRICE_PER_KB:-10}
+  #     REJECT_NON_GIT: ${REJECT_NON_GIT:-true}
+  #     NODE_ID: git-proxy
+  #     VERBOSE: ${GIT_PROXY_VERBOSE:-true}
+  #   ports:
+  #     - "3003:3002"
+  #   networks:
+  #     - crosstown-network
+  #   depends_on:
+  #     forgejo:
+  #       condition: service_healthy
+  #     crosstown:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "wget", "-q", "--spider", "http://localhost:3002/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 10s
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Quick Start Guide
@@ -270,7 +316,8 @@ services:
 #    - Explorer UI:       http://localhost:3001
 #    - Crosstown BLS:     http://localhost:3100
 #    - Nostr Relay:       ws://localhost:7100
-#    - Forgejo Web UI:    http://localhost:3003
+#    - Forgejo Web UI:    http://localhost:3004
+#    - Forgejo Git HTTP:  http://localhost:3004 (same as web, no payment required)
 #
 # 5. Get tokens for your wallet:
 #    🚰 Easy way: Use the faucet at http://localhost:3500

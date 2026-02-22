@@ -77,5 +77,7 @@ USER node
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -q --spider http://localhost:3100/health || exit 1
 
-# Start BLS
-CMD ["node", "dist/entrypoint.js"]
+# Start Crosstown node (use ENTRYPOINT env var to choose)
+# Default: entrypoint.js (full-featured node with Nostr relay, peer discovery, payment channels)
+# Minimal: entrypoint-bls-only.js (BLS only, no networking)
+CMD node dist/${ENTRYPOINT:-entrypoint.js}

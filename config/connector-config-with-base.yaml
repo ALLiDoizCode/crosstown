@@ -6,11 +6,13 @@ btpServerPort: 3000
 healthCheckPort: 8080
 logLevel: info
 
-# Initially empty - peers will be registered dynamically via admin API
+# Peers registered dynamically via bootstrap
 peers: []
 
-# Initially empty - routes will be added when peers are registered
-routes: []
+# Route to local BLS
+routes:
+  - prefix: g.crosstown
+    nextHop: local
 
 # Local delivery to Crosstown BLS
 localDelivery:

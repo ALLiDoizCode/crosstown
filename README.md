@@ -33,7 +33,9 @@ The key insight: **Nostr's social graph becomes the payment routing graph**. If 
 
 ## How It Works
 
-Crosstown uses **three custom Nostr event kinds** to enable ILP peering without manual configuration:
+Crosstown uses **custom Nostr event kinds** to enable ILP peering and payment-gated services:
+
+### Core ILP Peering Events
 
 | Kind | Name | Discovery | Purpose |
 |------|------|-----------|---------|
@@ -41,9 +43,82 @@ Crosstown uses **three custom Nostr event kinds** to enable ILP peering without 
 | **23194** | SPSP Request | Private (NIP-44 encrypted) | "I want to open a payment channel with you — here are my supported chains" |
 | **23195** | SPSP Response | Private (NIP-44 encrypted) | "Channel opened on chain X at address Y — here's your channel ID and payment destination" |
 
+### NIP-34: Git Operations via Nostr (Payment-Gated)
+
+| Kind | Name | Purpose |
+|------|------|---------|
+| **30617** | Repository Announcement | Advertise Git repositories available via Nostr |
+| **1617** | Patch | Submit code changes (like `git push`) |
+| **1621** | Issue | Create issues in repositories |
+| **1622** | Reply | Comment on patches or issues |
+
+**NIP-34 provides payment-gated Git operations** — users pay via ILP to submit patches, create issues, and interact with repositories. Unlike traditional Git HTTP (which is free), NIP-34 submissions require micropayments and are automatically applied to the Forgejo Git server.
+
 **Why these event kinds?**
 - **10032** is a *replaceable event* — when your connector details change (new settlement address, different chains), you publish a new event with the same `d` tag and it replaces the old one
 - **23194/23195** use *NIP-44 encryption* — negotiation happens in the open (via relays) but payment secrets stay private
+- **NIP-34 kinds (30617, 1617, 1621, 1622)** provide payment-gated Git operations via Nostr events
+
+### NIP-34 Git Integration: Payment-Gated Git via Nostr
+
+Crosstown includes **NIP-34 (Git Stuff)** integration, allowing users to interact with Git repositories through Nostr events instead of traditional Git HTTP. This provides a **payment-gated alternative** to free HTTP Git operations.
+
+**How it works:**
+
+```
+Developer                    Crosstown BLS                 Forgejo Git Server
+    │                              │                              │
+    │  1. Create patch             │                              │
+    │     (kind:1617 event)        │                              │
+    │                              │                              │
+    │  2. ILP Prepare              │                              │
+    │     (TOON-encoded event)     │                              │
+    │ ──────────────────────────> │                              │
+    │                              │  3. Validate payment         │
+    │                              │     (price = bytes × rate)   │
+    │                              │                              │
+    │                              │  4. Store event              │
+    │                              │                              │
+    │                              │  5. Apply patch via API      │
+    │                              │ ──────────────────────────> │
+    │                              │                              │  Create branch
+    │                              │                              │  Commit changes
+    │                              │                              │  Update refs
+    │                              │                              │
+    │  6. ILP Fulfill              │ <─────────────────────────── │
+    │ <────────────────────────── │                              │
+    │     (proof of storage)       │                              │
+```
+
+**Why use NIP-34 instead of HTTP Git?**
+
+| Feature | HTTP Git (port 3004) | NIP-34 (via Nostr) |
+|---------|----------------------|---------------------|
+| **Payment** | FREE | PAID (micropayments via ILP) |
+| **Protocol** | Standard Git HTTP | Nostr events |
+| **Spam protection** | None | Payment requirement |
+| **Decentralization** | Centralized (direct to server) | Decentralized (via Nostr relays) |
+| **Monetization** | No revenue | Repository owners earn from contributions |
+
+**Setting up NIP-34:**
+
+1. **Configure Forgejo API token** in `.env`:
+   ```bash
+   FORGEJO_TOKEN=your-api-token-here
+   FORGEJO_OWNER=admin
+   FORGEJO_URL=http://forgejo:3000
+   ```
+
+2. **Submit a patch via Nostr** (requires ILP payment):
+   ```bash
+   # Example: Submit a patch as a kind:1617 event
+   # Payment is automatically required by BLS
+   # See NIP-34-INTEGRATION.md for detailed examples
+   ```
+
+3. **Repository owner receives payment** for each contribution accepted
+
+**Learn more:** See [NIP-34-INTEGRATION.md](NIP-34-INTEGRATION.md) for complete workflows and examples.
 
 ### Network Bootstrap: Joining the Network
 
@@ -90,13 +165,14 @@ New Node                               Genesis Node (already on network)
 
 Crosstown is a monorepo with four packages:
 
-| Package | Purpose | Key Exports |
-|---------|---------|-------------|
-| **[@crosstown/core](packages/core)** | Discovery & peering foundation | `createCrosstownNode()`, `BootstrapService`, `RelayMonitor`, SPSP client/server, settlement negotiation |
-| **[@crosstown/relay](packages/relay)** | Nostr relay WebSocket server | `NostrRelayServer`, `EventStore`, TOON encoding, upstream relay propagation via `RelaySubscriber` |
-| **[@crosstown/bls](packages/bls)** | Standalone Business Logic Server | `createBlsServer()` — HTTP server that validates ILP payments and stores events |
-| **[@crosstown/faucet](packages/faucet)** | Token distribution service | Web-based faucet for distributing test ETH and AGENT tokens to developers |
-| **[@crosstown/examples](packages/examples)** | Working demos | `ilp-gated-relay-demo` showing the full stack in action |
+| Package | Purpose | Status | Key Exports |
+|---------|---------|--------|-------------|
+| **[@crosstown/core](packages/core)** | Discovery & peering foundation | ✅ Active | `createCrosstownNode()`, `BootstrapService`, `RelayMonitor`, SPSP client/server, settlement negotiation, NIP-34 handler |
+| **[@crosstown/relay](packages/relay)** | Nostr relay WebSocket server | ✅ Active | `NostrRelayServer`, `EventStore`, TOON encoding, upstream relay propagation via `RelaySubscriber` |
+| **[@crosstown/bls](packages/bls)** | Standalone Business Logic Server | ✅ Active | `createBlsServer()` — HTTP server that validates ILP payments and stores events, NIP-34 integration |
+| **[@crosstown/faucet](packages/faucet)** | Token distribution service | ✅ Active | Web-based faucet for distributing test ETH and AGENT tokens to developers |
+| **[@crosstown/git-proxy](packages/git-proxy)** | HTTP Git payment gateway | ⚠️ Disabled | ILP-gated Git HTTP operations (needs redesign per RFC-0035) |
+| **[@crosstown/examples](packages/examples)** | Working demos | ✅ Active | `ilp-gated-relay-demo` showing the full stack in action |
 
 **Package Relationships:**
 - `@crosstown/core` is the foundation (no dependencies on other packages)
@@ -391,6 +467,15 @@ Examples:
 
 ## Quick Start
 
+> **⚡ Important: What's Payment-Gated?**
+>
+> - ✅ **Nostr event writes** (kind:1, etc.) → PAID via ILP
+> - ✅ **NIP-34 Git operations** (patches, issues) → PAID via ILP
+> - ❌ **HTTP Git operations** (git clone, git push) → FREE (no payment required)
+> - ❌ **Forgejo Web UI** (browse, view) → FREE (no payment required)
+>
+> **Why HTTP Git is free:** The git-proxy (HTTP Git payment gateway) has been temporarily disabled as it needs to be redesigned to properly implement ILP over HTTP (RFC-0035). In the meantime, use **NIP-34** for payment-gated Git operations via Nostr events.
+
 ### Run the Demo (Embedded Mode)
 
 The fastest way to see Crosstown in action:
@@ -429,15 +514,17 @@ open http://localhost:3500
 
 **What you get:**
 
-| Service | URL | Purpose |
-|---------|-----|---------|
-| **🚰 Token Faucet** | http://localhost:3500 | Get 100 ETH + 10,000 AGENT tokens instantly |
-| **⚡ Anvil** | http://localhost:8545 | Local Ethereum blockchain (chain ID 31337) |
-| **🔗 Connector** | http://localhost:8080 | ILP packet routing (v1.19.1) |
-| **📊 Explorer UI** | http://localhost:3001 | Monitor ILP packets and balances |
-| **📡 Crosstown BLS** | http://localhost:3100 | Payment validation & event storage |
-| **🌐 Nostr Relay** | ws://localhost:7100 | Read events for free |
-| **🦊 Forgejo** | http://localhost:3003 | ILP-gated Git hosting |
+| Service | URL | Purpose | Payment |
+|---------|-----|---------|---------|
+| **🚰 Token Faucet** | http://localhost:3500 | Get 100 ETH + 10,000 AGENT tokens instantly | FREE |
+| **⚡ Anvil** | http://localhost:8545 | Local Ethereum blockchain (chain ID 31337) | FREE |
+| **🔗 Connector** | http://localhost:8080 | ILP packet routing (v1.19.1) | - |
+| **📊 Explorer UI** | http://localhost:3001 | Monitor ILP packets and balances | FREE |
+| **📡 Crosstown BLS** | http://localhost:3100 | Payment validation & event storage | - |
+| **🌐 Nostr Relay** | ws://localhost:7100 | Read events for free | FREE |
+| **🦊 Forgejo Web UI** | http://localhost:3004 | Browse repos, edit files, view commits | FREE |
+| **📦 Forgejo Git HTTP** | http://localhost:3004/repo.git | Standard Git operations (clone, push, pull) | FREE |
+| **⚡ NIP-34 Git** | Via Nostr events | Submit patches/issues via Nostr | PAID (ILP) |
 
 **Quick workflow:**
 1. **Get tokens** → Visit faucet, enter your address, receive tokens
@@ -489,17 +576,32 @@ When contributing to Crosstown:
 - **Mock external dependencies** — Tests shouldn't require live relays or real ILP connectors
 - **Passive discovery pattern** — Services observe and expose data; callers decide when to act
 
-## Proposed NIPs (Future Work)
+## Nostr Event Kinds
 
-Crosstown introduces **three new Nostr event kinds** that could become standardized NIPs:
+Crosstown implements and extends several Nostr event kinds:
 
-### NIP-XX: ILP Peering via Nostr Events
+### Implemented: NIP-34 (Git Stuff)
 
-**Event Kinds:**
+**Status:** ✅ Fully implemented with ILP payment gating
+
+| Kind | Name | Purpose |
+|------|------|---------|
+| **30617** | Repository Announcement | Advertise Git repositories |
+| **1617** | Patch | Submit code changes (paid via ILP) |
+| **1621** | Issue | Create repository issues (paid via ILP) |
+| **1622** | Reply | Comment on patches/issues (paid via ILP) |
+
+**Integration:** Crosstown's BLS validates NIP-34 events and automatically applies them to Forgejo via API. This enables **payment-gated Git operations** — users pay micropayments to submit patches, and repository owners earn revenue from contributions.
+
+**Learn more:** [NIP-34 Specification](https://github.com/nostr-protocol/nips/blob/master/34.md) | [Integration Guide](NIP-34-INTEGRATION.md)
+
+### Proposed: ILP Peering via Nostr Events
+
+**Status:** ⚠️ Implemented in Crosstown, not yet submitted as formal NIP
 
 | Kind | Name | Type | Purpose |
 |------|------|------|---------|
-| **10032** | ILP Peer Info | Parameterized replaceable (NIP-01) | Advertise ILP connector details (address, BTP endpoint, supported chains, settlement addresses) |
+| **10032** | ILP Peer Info | Parameterized replaceable | Advertise ILP connector details (address, BTP endpoint, supported chains, settlement addresses) |
 | **23194** | SPSP Request | Ephemeral encrypted (NIP-44) | Request payment channel setup with settlement chain negotiation |
 | **23195** | SPSP Response | Ephemeral encrypted (NIP-44) | Respond with opened channel ID and payment destination |
 
@@ -508,14 +610,22 @@ Crosstown introduces **three new Nostr event kinds** that could become standardi
 - Provides **encrypted payment channel negotiation** using existing Nostr infrastructure
 - Makes **micropayment routing** inherit Nostr's social graph (follow someone → route payments through them)
 
-**Current status:** Implemented in Crosstown, not yet submitted to `nostr-protocol/nips`
+**Future work:** Submit to `nostr-protocol/nips` repository for standardization
 
 ## Related Specifications
 
+### Nostr Specifications
 - [NIP-01: Basic Protocol](https://github.com/nostr-protocol/nips/blob/master/01.md) — Base Nostr relay protocol
+- [NIP-34: Git Stuff](https://github.com/nostr-protocol/nips/blob/master/34.md) — Git operations via Nostr events (repositories, patches, issues)
 - [NIP-44: Encrypted Payloads](https://github.com/nostr-protocol/nips/blob/master/44.md) — Secures SPSP handshakes
-- [SPSP (RFC 0009)](https://interledger.org/developers/rfcs/simple-payment-setup-protocol/) — Simple Payment Setup Protocol
-- [Peering, Clearing and Settlement (RFC 0032)](https://interledger.org/developers/rfcs/peering-clearing-settling/) — ILP peering model
+
+### Interledger Specifications
+- [RFC 0009: SPSP](https://interledger.org/developers/rfcs/simple-payment-setup-protocol/) — Simple Payment Setup Protocol
+- [RFC 0027: ILPv4](https://interledger.org/developers/rfcs/interledger-protocol-v4/) — Interledger Protocol V4
+- [RFC 0032: Peering, Clearing and Settlement](https://interledger.org/developers/rfcs/peering-clearing-settling/) — ILP peering model
+- [RFC 0035: ILP Over HTTP](https://interledger.org/developers/rfcs/ilp-over-http/) — Transport ILP packets over HTTP
+
+### Other
 - [TOON Format](https://toonformat.dev) — Compact, human-readable JSON encoding for LLMs
 
 ## License

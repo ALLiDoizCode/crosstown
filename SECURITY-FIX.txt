@@ -1,0 +1,16 @@
+🔒 CRITICAL SECURITY FIX APPLIED
+==================================
+
+Issue: Web UI bypass allowed payment-free commits
+Fix: Port separation + Git path validation
+
+NEW PORTS:
+- 3004 = Forgejo Web UI (FREE browsing)
+- 3003 = Git operations (PAID clone/push)
+
+SECURITY:
+✅ Web editor disabled
+✅ Non-Git paths rejected
+✅ All write operations require payment
+
+See: SECURITY-FIX-SUMMARY.md for details

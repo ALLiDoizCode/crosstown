@@ -119,11 +119,6 @@ services:
       PEER3_EVM_ADDRESS: "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65"
       PEER4_EVM_ADDRESS: "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"
 
-      # BTP Peer Secrets for authentication
-      BTP_PEER_PEER2_SECRET: "crosstown-network-secret-2026"
-      BTP_PEER_PEER3_SECRET: "crosstown-network-secret-2026"
-      BTP_PEER_PEER4_SECRET: "crosstown-network-secret-2026"
-
       EXPLORER_ENABLED: ${EXPLORER_ENABLED:-true}
     ports:
       - "3001:3000"   # BTP
@@ -206,10 +201,6 @@ services:
       TREASURY_EVM_PRIVATE_KEY: "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6"
       M2M_TOKEN_ADDRESS: ${BASE_TOKEN_ADDRESS:-0x5FbDB2315678afecb367f032d93F642f64180aa3}
       TOKEN_NETWORK_REGISTRY: ${BASE_REGISTRY_ADDRESS:-0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512}
-      # BTP Peer Secrets
-      BTP_PEER_PEER1_SECRET: "crosstown-network-secret-2026"
-      BTP_PEER_PEER3_SECRET: "crosstown-network-secret-2026"
-      BTP_PEER_PEER4_SECRET: "crosstown-network-secret-2026"
       EXPLORER_ENABLED: ${EXPLORER_ENABLED:-true}
     ports:
       - "3002:3000"
@@ -296,10 +287,6 @@ services:
       PEER2_EVM_ADDRESS: "0x90F79bf6EB2c4f870365E785982E1f101E93b906"
       PEER3_EVM_ADDRESS: "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65"
       PEER4_EVM_ADDRESS: "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"
-      # BTP Peer Secrets
-      BTP_PEER_PEER1_SECRET: "crosstown-network-secret-2026"
-      BTP_PEER_PEER2_SECRET: "crosstown-network-secret-2026"
-      BTP_PEER_PEER4_SECRET: "crosstown-network-secret-2026"
       EXPLORER_ENABLED: ${EXPLORER_ENABLED:-true}
     ports:
       - "3003:3000"
