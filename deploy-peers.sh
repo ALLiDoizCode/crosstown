@@ -111,7 +111,7 @@ log_success "Genesis node is running"
 if ! docker network inspect crosstown-network &>/dev/null; then
     log_error "crosstown-network does not exist"
     log_info "The genesis deployment should create this network"
-    log_info "Try: docker compose -f docker-compose-read-only-git.yml up -d"
+    log_info "Try: ./deploy-genesis-node.sh"
     exit 1
 fi
 log_success "Docker network exists"

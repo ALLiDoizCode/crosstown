@@ -25,7 +25,7 @@ BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 # Configuration
-COMPOSE_FILE="docker-compose-read-only-git.yml"
+COMPOSE_FILE="docker-compose-genesis.yml"
 ENV_FILE=".env"
 GENESIS_ENV="genesis.env"
 
