@@ -1,16 +1,17 @@
 # Crosstown Protocol
 
-A Nostr relay that solves the relay business model by also being an ILP connector that gates writes with micropayments.
+An ILP-gated Nostr relay that solves the relay sustainability problem through micropayments. Pay to write, free to read.
 
-## Project Overview
+Crosstown bridges Nostr and Interledger Protocol (ILP) to enable:
+- **Peer Discovery via NIP-02**: Social graphs become payment routing networks
+- **SPSP over Nostr**: Exchange payment parameters via Nostr events (no HTTPS required)
+- **Payment Channels**: Automatic on-chain channel creation with off-chain settlement
+- **ILP-Gated Writes**: Sustainable relay business model through pay-per-event micropayments
+- **TOON-Native**: Events encoded in TOON format for efficient agent digestion
 
-Crosstown is an ILP-gated Nostr relay. It bridges Nostr and Interledger Protocol (ILP), enabling:
+**Quick Start**: Deploy a genesis node in 2 minutes → [Getting Started](#getting-started)
 
-1. **Peer Discovery via NIP-02**: Use Nostr follow lists to discover ILP peers
-2. **SPSP over Nostr**: Exchange SPSP parameters via Nostr events instead of HTTPS
-3. **Payment Channels**: Automatic payment channel creation during bootstrap with settlement
-4. **ILP-Gated Writes**: Pay to write events, free to read — relay sustainability through micropayments
-5. **Decentralized Connector Registry**: Publish and discover connector info via relays
+---
 
 ## Architecture
 
@@ -24,7 +25,6 @@ Crosstown is an ILP-gated Nostr relay. It bridges Nostr and Interledger Protocol
 │  - Event kinds for ILP peering (kind:10032, kind:23194/95)  │
 └─────────────────────────────────────────────────────────────┘
                               │
-                              │ populates
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │            @crosstown/relay + @crosstown/bls                │
@@ -35,26 +35,35 @@ Crosstown is an ILP-gated Nostr relay. It bridges Nostr and Interledger Protocol
 │  - Pay to write, free to read                               │
 └─────────────────────────────────────────────────────────────┘
                               │
-                              │ routes packets
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    ILP Connector                             │
 │                                                             │
 │  - Routes packets (no Nostr knowledge)                      │
 │  - Manages balances with configured peers                   │
-│  - Settlement engines                                       │
+│  - Settlement via payment channels                          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Event Kinds (Proposed NIPs)
+**Data Flow**:
+1. Client subscribes to relay (free)
+2. Client sends EVENT with ILP payment (paid)
+3. BLS validates payment, stores event
+4. Other clients query events (free)
+
+---
+
+## Event Kinds
 
 | Kind | Name | Purpose |
 |------|------|---------|
 | `10032` | ILP Peer Info | Replaceable event with connector's ILP address, BTP endpoint, settlement info |
-| `23194` | SPSP Request | NIP-44 encrypted request for fresh SPSP parameters |
-| `23195` | SPSP Response | NIP-44 encrypted response with SPSP destination_account and shared_secret |
+| `23194` | SPSP Request | NIP-44 encrypted request for SPSP parameters |
+| `23195` | SPSP Response | NIP-44 encrypted response with SPSP destination and shared secret |
 
-**Note:** SPSP uses encrypted request/response (kind:23194/23195) to securely exchange shared secrets. Static publishing was removed as it exposed secrets in plaintext.
+**Note**: These are proposed NIPs. SPSP uses encrypted request/response to securely exchange shared secrets.
+
+---
 
 ## Key Design Decisions
 
@@ -62,58 +71,124 @@ Crosstown is an ILP-gated Nostr relay. It bridges Nostr and Interledger Protocol
 NIP-02 follows represent peering relationships. If Alice follows Bob, Alice trusts Bob to route payments.
 
 ### Nostr Populates, Doesn't Replace
-The Nostr layer is for discovery and configuration. Actual packet routing uses local routing tables in the connector.
+Nostr is for discovery and configuration. Actual packet routing uses local routing tables in the connector. Discovery ≠ Peering.
 
 ### Pay to Write, Free to Read
-The relay gates EVENT writes with ILP micropayments, solving the relay sustainability problem. Reading via REQ/EVENT/EOSE is free.
+The relay gates EVENT writes with ILP micropayments, solving relay sustainability. Reading via REQ/EVENT/EOSE is free.
 
 ### TOON-Native
-Events are encoded in [TOON format](https://github.com/nicholasgasior/toon) throughout the stack — written as TOON in ILP packets, stored as TOON in the event store, and returned as TOON from the relay. TOON is the native wire format, designed for agent digestion rather than human readability.
-
-### Discovery ≠ Peering
-The RelayMonitor discovers new peers (kind:10032) and emits events, but does **not** automatically initiate peering. The `CrosstownNode` exposes `peerWith()` as a method so the caller can decide when and whether to peer. Discovery is passive observation; peering is an explicit decision.
+Events are encoded in [TOON format](https://github.com/nicholasgasior/toon) throughout the stack. TOON is the native wire format, designed for agent digestion rather than human readability.
 
 ### Payment Channels for Settlement
-The bootstrap flow automatically creates payment channels when settlement is enabled:
-- **SPSP Negotiation**: Exchange settlement parameters (chain, token, addresses) via SPSP
-- **TokenNetwork Integration**: Uses TokenNetworkRegistry to manage per-token payment channels
-- **Channel Opening**: Automatically opens channels with initial deposit during handshaking phase
-- **Off-chain Payments**: Peers exchange signed claims that can be settled on-chain
-- **Nonce Management**: Retry logic handles blockchain transaction conflicts gracefully
+Bootstrap automatically creates on-chain payment channels:
+- **SPSP Negotiation**: Exchange settlement parameters (chain, token, addresses)
+- **Channel Creation**: Happens BEFORE SPSP handshake (fixed as of 2026-02-26)
+- **TokenNetwork Integration**: Uses TokenNetworkRegistry for per-token channels
+- **Off-chain Payments**: Signed balance proofs settle on-chain
+- **Nonce Management**: Retry logic handles blockchain conflicts gracefully
 
-## Testing
+---
 
-### Bootstrap Flow Test
-Run the complete bootstrap flow with payment channels:
+## Getting Started
+
+### Prerequisites
+- Docker & Docker Compose
+- Node.js 18+ (for running tests)
+- Connector contracts repository cloned to `../connector`
+
+### Deploy Genesis Node
+
 ```bash
-bash test-payment-channels.sh
+./deploy-genesis-node.sh
 ```
 
-This test:
-- Restarts Anvil for fresh blockchain state
-- Deploys TokenNetworkRegistry and AGENT token contracts
-- Funds peer wallets with tokens
-- Runs bootstrap test with settlement enabled
-- Verifies channel creation (expect `channelCount: 1`)
+This deploys:
+- Anvil (local blockchain with payment channel contracts)
+- Token Faucet (ETH + AGENT token distribution)
+- ILP Connector (packet routing + settlement)
+- Crosstown Node (Nostr relay + BLS)
 
-### Verify On-Chain State
-Check payment channel state on blockchain:
+**Service Endpoints**:
+- Faucet: http://localhost:3500
+- Relay: ws://localhost:7100
+- BLS: http://localhost:3100
+- Connector: http://localhost:8080
+
+### Verify Deployment
+
 ```bash
-bash verify-channel-state.sh
+cd packages/client
+pnpm test:e2e genesis-bootstrap-with-channels
 ```
 
-See `PAYMENT-CHANNELS-SUCCESS.md` for complete documentation.
+This E2E test verifies:
+- Bootstrap with payment channel creation
+- Signed balance proof generation
+- Event publishing with ILP payment
+- On-chain channel state validation
 
-## Development Guidelines
+### Deploy Peer Nodes
 
-- Use `nostr-tools` for all Nostr operations
-- All event kinds should be well-documented for potential NIP submission
-- Keep ILP-specific logic separate from Nostr-specific logic
-- Write tests that don't require live relays (mock SimplePool)
+```bash
+./deploy-peers.sh 3  # Deploy 3 peer nodes
+```
+
+---
+
+## Contract Addresses (Anvil)
+
+Deterministic addresses from `DeployLocal.s.sol`:
+- **AGENT Token**: `0x5FbDB2315678afecb367f032d93F642f64180aa3`
+- **TokenNetworkRegistry**: `0xe7f1725e7734ce288f8367e1bb143e90bb3f0512`
+- **TokenNetwork (AGENT)**: `0xCafac3dD18aC6c6e92c921884f9E4176737C052c` (created by registry)
+
+---
+
+## Project Structure
+
+```
+crosstown/
+├── packages/
+│   ├── client/       # Client SDK with payment channel support
+│   ├── core/         # Shared protocol logic
+│   ├── relay/        # Nostr relay + TOON encoding
+│   ├── bls/          # Business Logic Server (payment validation)
+│   └── faucet/       # Token distribution for testing
+├── docker/           # Container entrypoint
+├── deploy-genesis-node.sh    # Genesis deployment
+└── deploy-peers.sh           # Peer deployment
+```
+
+---
+
+## Troubleshooting
+
+**Genesis node won't start?**
+1. Check Docker is running: `docker ps`
+2. Verify connector contracts exist: `ls ../connector/packages/contracts`
+3. Check logs: `docker logs crosstown-node`
+
+**Tests failing?**
+1. Ensure genesis node is running: `curl http://localhost:3100/health`
+2. Verify Anvil is healthy: `curl http://localhost:8545`
+3. Check for stale containers: `./deploy-genesis-node.sh --reset`
+
+**For detailed documentation**: See `/docs/` directory
+
+---
+
+## Development
+
+- **Monorepo**: Uses pnpm workspaces
+- **Build**: `pnpm -r build` (builds all packages)
+- **Test**: `cd packages/client && pnpm test:e2e`
+- **Logs**: `docker compose -p crosstown-genesis logs -f crosstown`
+
+---
 
 ## Related Specifications
 
 - [NIP-02: Follow List](https://github.com/nostr-protocol/nips/blob/master/02.md)
-- [NIP-47: Nostr Wallet Connect](https://github.com/nostr-protocol/nips/blob/master/47.md)
 - [RFC 0009: Simple Payment Setup Protocol](https://interledger.org/developers/rfcs/simple-payment-setup-protocol/)
 - [RFC 0032: Peering, Clearing and Settlement](https://interledger.org/developers/rfcs/peering-clearing-settling/)
+- [TOON Format](https://github.com/nicholasgasior/toon)
