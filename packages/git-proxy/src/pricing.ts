@@ -7,7 +7,11 @@
  * - Pricing configuration
  */
 
-import type { GitProxyConfig, GitOperation, GitOperationMetadata } from './types.js';
+import type {
+  GitProxyConfig,
+  GitOperation,
+  GitOperationMetadata,
+} from './types.js';
 
 export class GitPaymentCalculator {
   constructor(private config: GitProxyConfig) {}
@@ -65,7 +69,9 @@ export class GitPaymentCalculator {
    */
   parseRepository(path: string): string {
     // Remove /git/ prefix and /info/refs or /git-*-pack suffix
-    const match = path.match(/\/([^/]+?)(?:\.git)?(?:\/info\/refs|\/git-\w+-pack)?$/);
+    const match = path.match(
+      /\/([^/]+?)(?:\.git)?(?:\/info\/refs|\/git-\w+-pack)?$/
+    );
     return match?.[1] || 'unknown';
   }
 }

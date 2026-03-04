@@ -12,8 +12,14 @@
 
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
+import type { Context } from 'hono';
+import type { Dispatcher } from 'undici';
 import { request } from 'undici';
-import type { GitProxyConfig, PaymentResult, GitOperationMetadata } from './types.js';
+import type {
+  GitProxyConfig,
+  PaymentResult,
+  GitOperationMetadata,
+} from './types.js';
 import { GitPaymentCalculator } from './pricing.js';
 
 export class GitProxyServer {
@@ -51,7 +57,8 @@ export class GitProxyServer {
         return c.json(
           {
             error: 'Not a Git operation',
-            message: 'This endpoint only accepts Git HTTP operations. Access the web UI at port 3004.',
+            message:
+              'This endpoint only accepts Git HTTP operations. Access the web UI at port 3004.',
             path,
           },
           403
@@ -75,7 +82,9 @@ export class GitProxyServer {
       // Calculate price
       metadata.estimatedPrice = this.calculator.calculatePrice(metadata);
 
-      this.log(`Git ${operation} on ${repository} - price: ${metadata.estimatedPrice}`);
+      this.log(
+        `Git ${operation} on ${repository} - price: ${metadata.estimatedPrice}`
+      );
 
       // If free operation, proxy immediately
       if (metadata.estimatedPrice === 0n) {
@@ -98,7 +107,10 @@ export class GitProxyServer {
       }
 
       // Validate payment
-      const paymentResult = await this.validatePayment(paymentProof, metadata.estimatedPrice);
+      const paymentResult = await this.validatePayment(
+        paymentProof,
+        metadata.estimatedPrice
+      );
       if (!paymentResult.valid) {
         return c.json(
           {
@@ -118,7 +130,10 @@ export class GitProxyServer {
   /**
    * Validate payment with BLS
    */
-  private async validatePayment(proof: string, expectedAmount: bigint): Promise<PaymentResult> {
+  private async validatePayment(
+    proof: string,
+    expectedAmount: bigint
+  ): Promise<PaymentResult> {
     try {
       // Call BLS to validate payment proof
       const response = await request(`${this.config.blsUrl}/validate-payment`, {
@@ -139,16 +154,19 @@ export class GitProxyServer {
         };
       }
 
-      const result = await response.body.json() as any;
+      const result = (await response.body.json()) as Record<string, unknown>;
       return {
-        valid: result.valid === true,
-        amount: result.amount ? BigInt(result.amount) : undefined,
-        error: result.error,
+        valid: result['valid'] === true,
+        amount: result['amount']
+          ? BigInt(result['amount'] as string)
+          : undefined,
+        error: result['error'] as string | undefined,
       };
     } catch (error) {
       return {
         valid: false,
-        error: error instanceof Error ? error.message : 'Payment validation failed',
+        error:
+          error instanceof Error ? error.message : 'Payment validation failed',
       };
     }
   }
@@ -156,20 +174,33 @@ export class GitProxyServer {
   /**
    * Proxy request to upstream Forgejo server
    */
-  private async proxyRequest(c: any, path: string, method: string): Promise<Response> {
+  private async proxyRequest(
+    c: Context,
+    path: string,
+    method: string
+  ): Promise<Response> {
     try {
       const upstreamUrl = `${this.config.upstreamUrl}${path}`;
 
       // Get request body if present
-      const body = method !== 'GET' && method !== 'HEAD'
-        ? await c.req.arrayBuffer()
-        : undefined;
+      const body =
+        method !== 'GET' && method !== 'HEAD'
+          ? await c.req.arrayBuffer()
+          : undefined;
 
       // Forward headers (excluding hop-by-hop headers)
       const headers: Record<string, string> = {};
       c.req.raw.headers.forEach((value: string, key: string) => {
         const lowerKey = key.toLowerCase();
-        if (!['host', 'connection', 'keep-alive', 'transfer-encoding', 'x-ilp-payment-proof'].includes(lowerKey)) {
+        if (
+          ![
+            'host',
+            'connection',
+            'keep-alive',
+            'transfer-encoding',
+            'x-ilp-payment-proof',
+          ].includes(lowerKey)
+        ) {
           headers[key] = value;
         }
       });
@@ -178,7 +209,7 @@ export class GitProxyServer {
 
       // Make upstream request
       const response = await request(upstreamUrl, {
-        method: method as any,
+        method: method as Dispatcher.HttpMethod,
         headers,
         body: body ? Buffer.from(body) : undefined,
       });
@@ -192,16 +223,19 @@ export class GitProxyServer {
       }
 
       // Return streaming response
-      return new Response(response.body as any, {
+      return new Response(response.body as unknown as ReadableStream, {
         status: response.statusCode,
         headers: responseHeaders,
       });
     } catch (error) {
-      this.log(`Proxy error: ${error instanceof Error ? error.message : 'Unknown'}`);
+      this.log(
+        `Proxy error: ${error instanceof Error ? error.message : 'Unknown'}`
+      );
       return c.json(
         {
           error: 'Proxy error',
-          message: error instanceof Error ? error.message : 'Failed to proxy request',
+          message:
+            error instanceof Error ? error.message : 'Failed to proxy request',
         },
         502
       );

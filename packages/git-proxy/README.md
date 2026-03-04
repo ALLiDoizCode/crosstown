@@ -28,26 +28,26 @@ Git Client → Git Proxy (ILP validation) → Forgejo
 
 ## Pricing
 
-| Operation | Base Price | Per KB | Notes |
-|-----------|-----------|--------|-------|
-| **info-refs** | FREE | - | Git discovery (required for all operations) |
-| **clone/fetch** | 100 units | 10 units/KB | Read operations |
-| **push** | 1000 units | 10 units/KB | Write operations (higher base price) |
+| Operation       | Base Price | Per KB      | Notes                                       |
+| --------------- | ---------- | ----------- | ------------------------------------------- |
+| **info-refs**   | FREE       | -           | Git discovery (required for all operations) |
+| **clone/fetch** | 100 units  | 10 units/KB | Read operations                             |
+| **push**        | 1000 units | 10 units/KB | Write operations (higher base price)        |
 
 Prices are configurable via environment variables.
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GIT_PROXY_PORT` | `3002` | Port to listen on |
-| `FORGEJO_URL` | *required* | Upstream Forgejo URL |
-| `BLS_URL` | *required* | BLS endpoint for payment validation |
-| `READ_PRICE` | `100` | Base price for read operations |
-| `WRITE_PRICE` | `1000` | Base price for write operations |
-| `PRICE_PER_KB` | `10` | Additional cost per kilobyte |
-| `NODE_ID` | - | Optional node identifier |
-| `VERBOSE` | `false` | Enable verbose logging |
+| Variable         | Default    | Description                         |
+| ---------------- | ---------- | ----------------------------------- |
+| `GIT_PROXY_PORT` | `3002`     | Port to listen on                   |
+| `FORGEJO_URL`    | _required_ | Upstream Forgejo URL                |
+| `BLS_URL`        | _required_ | BLS endpoint for payment validation |
+| `READ_PRICE`     | `100`      | Base price for read operations      |
+| `WRITE_PRICE`    | `1000`     | Base price for write operations     |
+| `PRICE_PER_KB`   | `10`       | Additional cost per kilobyte        |
+| `NODE_ID`        | -          | Optional node identifier            |
+| `VERBOSE`        | `false`    | Enable verbose logging              |
 
 ## Docker Usage
 
@@ -109,6 +109,7 @@ git clone http://localhost:3003/user/repo.git
 Health check endpoint.
 
 **Response:**
+
 ```json
 {
   "status": "healthy",
@@ -123,6 +124,7 @@ Health check endpoint.
 Proxies Git HTTP protocol requests after validating payment.
 
 **Payment Required Response (402):**
+
 ```json
 {
   "error": "Payment required",

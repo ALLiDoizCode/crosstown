@@ -2,10 +2,10 @@
  * Git operation types
  */
 export type GitOperation =
-  | 'clone'         // git clone (read-only)
-  | 'fetch'         // git fetch/pull (read-only)
-  | 'push'          // git push (write)
-  | 'info-refs';    // discovery (usually free)
+  | 'clone' // git clone (read-only)
+  | 'fetch' // git fetch/pull (read-only)
+  | 'push' // git push (write)
+  | 'info-refs'; // discovery (usually free)
 
 /**
  * Git proxy configuration

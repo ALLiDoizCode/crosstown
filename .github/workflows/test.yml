@@ -17,13 +17,13 @@ on:
     branches: [main]
   schedule:
     # Nightly E2E at 2 AM UTC
-    - cron: "0 2 * * *"
+    - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
       test_level:
-        description: "Test level to run"
+        description: 'Test level to run'
         required: false
-        default: "all"
+        default: 'all'
         type: choice
         options:
           - unit
@@ -36,8 +36,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: "20"
-  PNPM_VERSION: "8"
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8'
 
 jobs:
   # ─────────────────────────────────────────────
@@ -61,7 +61,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: "pnpm"
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -107,7 +107,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: "pnpm"
+          cache: 'pnpm'
 
       - name: Restore build artifacts
         uses: actions/cache/restore@v4
@@ -162,7 +162,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: "pnpm"
+          cache: 'pnpm'
 
       - name: Restore build artifacts
         uses: actions/cache/restore@v4
@@ -230,7 +230,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: "pnpm"
+          cache: 'pnpm'
 
       - name: Restore build artifacts
         uses: actions/cache/restore@v4

@@ -1,17 +1,14 @@
 import { encode } from '@toon-format/toon';
 import type { NostrEvent } from 'nostr-tools/pure';
-import { BlsBaseError } from '../errors.js';
+import { CrosstownError } from '../errors.js';
 
 /**
  * Error thrown when TOON encoding fails.
  */
-export class ToonEncodeError extends BlsBaseError {
+export class ToonEncodeError extends CrosstownError {
   constructor(message: string, cause?: Error) {
-    super(message, 'TOON_ENCODE_ERROR');
+    super(message, 'TOON_ENCODE_ERROR', cause);
     this.name = 'ToonEncodeError';
-    if (cause) {
-      this.cause = cause;
-    }
   }
 }
 
@@ -29,6 +26,27 @@ export function encodeEventToToon(event: NostrEvent): Uint8Array {
   try {
     const toonString = encode(event);
     return new TextEncoder().encode(toonString);
+  } catch (error) {
+    throw new ToonEncodeError(
+      `Failed to encode event to TOON: ${error instanceof Error ? error.message : String(error)}`,
+      error instanceof Error ? error : undefined
+    );
+  }
+}
+
+/**
+ * Encode a NostrEvent to TOON format as a string.
+ *
+ * Used for embedding TOON-encoded events in outbound WebSocket messages
+ * where the NIP-01 framing remains JSON but the event payload is TOON.
+ *
+ * @param event - The NostrEvent to encode
+ * @returns TOON-encoded string representation of the event
+ * @throws ToonEncodeError if encoding fails
+ */
+export function encodeEventToToonString(event: NostrEvent): string {
+  try {
+    return encode(event);
   } catch (error) {
     throw new ToonEncodeError(
       `Failed to encode event to TOON: ${error instanceof Error ? error.message : String(error)}`,

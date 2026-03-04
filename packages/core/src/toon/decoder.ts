@@ -1,27 +1,16 @@
 import { decode } from '@toon-format/toon';
 import type { NostrEvent } from 'nostr-tools/pure';
-import { RelayError } from '../storage/index.js';
+import { CrosstownError } from '../errors.js';
+import { isValidHex } from './validate.js';
 
 /**
  * Error thrown when TOON decoding or validation fails.
  */
-export class ToonError extends RelayError {
+export class ToonError extends CrosstownError {
   constructor(message: string, cause?: Error) {
-    super(message, 'TOON_DECODE_ERROR');
+    super(message, 'TOON_DECODE_ERROR', cause);
     this.name = 'ToonError';
-    if (cause) {
-      this.cause = cause;
-    }
   }
-}
-
-/**
- * Validate that a value is a valid hex string of expected length.
- */
-function isValidHex(value: unknown, length: number): value is string {
-  if (typeof value !== 'string') return false;
-  if (value.length !== length) return false;
-  return /^[0-9a-f]+$/i.test(value);
 }
 
 /**
@@ -41,7 +30,9 @@ function validateNostrEvent(obj: unknown): asserts obj is NostrEvent {
 
   // Validate pubkey (64-char hex)
   if (!isValidHex(event['pubkey'], 64)) {
-    throw new ToonError('Invalid event pubkey: must be a 64-character hex string');
+    throw new ToonError(
+      'Invalid event pubkey: must be a 64-character hex string'
+    );
   }
 
   // Validate kind (number)
@@ -72,13 +63,18 @@ function validateNostrEvent(obj: unknown): asserts obj is NostrEvent {
   }
 
   // Validate created_at (number)
-  if (typeof event['created_at'] !== 'number' || !Number.isInteger(event['created_at'])) {
+  if (
+    typeof event['created_at'] !== 'number' ||
+    !Number.isInteger(event['created_at'])
+  ) {
     throw new ToonError('Invalid event created_at: must be an integer');
   }
 
   // Validate sig (128-char hex)
   if (!isValidHex(event['sig'], 128)) {
-    throw new ToonError('Invalid event sig: must be a 128-character hex string');
+    throw new ToonError(
+      'Invalid event sig: must be a 128-character hex string'
+    );
   }
 }
 
