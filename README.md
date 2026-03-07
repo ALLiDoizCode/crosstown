@@ -2,7 +2,7 @@
 
 **An ILP-gated Nostr relay that solves relay sustainability through micropayments: pay to write, free to read.**
 
-Crosstown bridges Nostr and Interledger Protocol (ILP) to create a self-sustaining relay network. Nodes publish their ILP connector info as Nostr events, discover peers by subscribing to relays, and negotiate payment channels through encrypted SPSP handshakes — eliminating manual peering configuration.
+Crosstown bridges Nostr and Interledger Protocol (ILP) to create a self-sustaining relay network. Nodes publish their ILP connector info as Nostr events, discover peers by subscribing to relays, and open payment channels using publicly advertised settlement data — eliminating manual peering configuration.
 
 ## Mental Model
 
@@ -40,11 +40,11 @@ Crosstown uses **custom Nostr event kinds** to enable ILP peering and payment-ga
 
 ### Core ILP Peering Events
 
-| Kind      | Name          | Discovery                  | Purpose                                                                                                            |
-| --------- | ------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **10032** | ILP Peer Info | Public (anyone can read)   | Advertise your node's ILP address, BTP endpoint, supported chains, and settlement addresses — like a business card |
-| **23194** | SPSP Request  | Private (NIP-44 encrypted) | "I want to open a payment channel with you — here are my supported chains"                                         |
-| **23195** | SPSP Response | Private (NIP-44 encrypted) | "Channel opened on chain X at address Y — here's your channel ID and payment destination"                          |
+| Kind      | Name          | Discovery                | Purpose                                                                                                            |
+| --------- | ------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| **10032** | ILP Peer Info | Public (anyone can read) | Advertise your node's ILP address, BTP endpoint, supported chains, settlement addresses, and TokenNetwork contracts — like a business card |
+
+> **Note:** SPSP handshake events (kind:23194/23195) have been removed from the protocol. Settlement negotiation now runs locally using kind:10032 data, channels are opened unilaterally, and BTP claims include chain/contract coordinates for on-chain verification.
 
 ### NIP-34: Git Operations via Nostr (Payment-Gated)
 
@@ -59,8 +59,7 @@ Crosstown uses **custom Nostr event kinds** to enable ILP peering and payment-ga
 
 **Why these event kinds?**
 
-- **10032** is a _replaceable event_ — when your connector details change (new settlement address, different chains), you publish a new event with the same `d` tag and it replaces the old one
-- **23194/23195** use _NIP-44 encryption_ — negotiation happens in the open (via relays) but payment secrets stay private
+- **10032** is a _replaceable event_ — when your connector details change (new settlement address, different chains), you publish a new event with the same `d` tag and it replaces the old one. It serves as the "menu" of what a node accepts: supported chains, settlement addresses, token preferences, and TokenNetwork contract addresses
 - **NIP-34 kinds (30617, 1617, 1621, 1622)** provide payment-gated Git operations via Nostr events
 
 ### NIP-34 Git Integration: Payment-Gated Git via Nostr
@@ -137,21 +136,25 @@ New Node                               Genesis Node (already on network)
    │  ─────────────────────────────────────────> │
    │  Query relay: "show me all kind:10032"      │
    │  Result: found 5 peer info events           │
+   │  Read settlement info: chains, addresses,   │
+   │  TokenNetwork contracts                     │
    │                                              │
-   │  Phase 2: HANDSHAKE                         │
-   │  ILP Prepare (kind:23194 encrypted request) │
-   │  ─────────────────────────────────────────> │
-   │                                              │  "I support chains A, B, C"
-   │                                              │  "Let's use chain B"
-   │                                              │  Opens payment channel on-chain
-   │  ILP Fulfill (kind:23195 encrypted response)│
-   │ <───────────────────────────────────────────│
-   │  "Channel opened! ID=abc123"                │
+   │  Phase 2: REGISTER + OPEN CHANNEL           │
+   │  (local) Run chain negotiation algorithm    │
+   │  (local) Find intersection of supported     │
+   │          chains from kind:10032 data        │
+   │  (on-chain) Open payment channel            │
+   │  unilaterally on negotiated chain           │
+   │  Register peer with connector               │
    │                                              │
    │  Phase 3: ANNOUNCE                          │
    │  ILP Prepare (my kind:10032 event in TOON)  │
    │  ─────────────────────────────────────────> │
    │  Payment: 1500 units for 150 bytes          │
+   │  BTP claim: self-describing with chainId,   │
+   │  tokenNetworkAddress, channelId, signature  │
+   │                                              │  Verify channel on-chain
+   │                                              │  Cache verified channel
    │                                              │  Store event in relay
    │  ILP Fulfill                                 │
    │ <───────────────────────────────────────────│
@@ -161,9 +164,9 @@ New Node                               Genesis Node (already on network)
 
 **What happens in each phase:**
 
-1. **DISCOVER** — Free read from relay to find existing peers (kind:10032 events)
-2. **HANDSHAKE** — Negotiate settlement chain and open payment channel (kind:23194/23195 via ILP)
-3. **ANNOUNCE** — Pay to publish your own kind:10032 event so others can discover you
+1. **DISCOVER** — Free read from relay to find existing peers (kind:10032 events with settlement info)
+2. **REGISTER** — Negotiate chain locally using kind:10032 data, open payment channel unilaterally on-chain, register peer with connector
+3. **ANNOUNCE** — Pay to publish your own kind:10032 event so others can discover you. BTP claims are self-describing (include chainId, tokenNetworkAddress, tokenAddress) and verified on-chain by the receiving connector
 
 **After bootstrap:** The `RelayMonitor` continuously watches for new kind:10032 events. When a new peer appears, it's added to the discovered peers list — but peering doesn't happen automatically. You call `node.peerWith(pubkey)` when you're ready to establish a payment channel with that peer.
 
@@ -173,7 +176,7 @@ Crosstown is a monorepo with four packages:
 
 | Package                                        | Purpose                          | Status      | Key Exports                                                                                                             |
 | ---------------------------------------------- | -------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **[@crosstown/core](packages/core)**           | Discovery & peering foundation   | ✅ Active   | `createCrosstownNode()`, `BootstrapService`, `RelayMonitor`, SPSP client/server, settlement negotiation, NIP-34 handler |
+| **[@crosstown/core](packages/core)**           | Discovery & peering foundation   | ✅ Active   | `createCrosstownNode()`, `BootstrapService`, `RelayMonitor`, settlement negotiation, NIP-34 handler |
 | **[@crosstown/relay](packages/relay)**         | Nostr relay WebSocket server     | ✅ Active   | `NostrRelayServer`, `EventStore`, TOON encoding, upstream relay propagation via `RelaySubscriber`                       |
 | **[@crosstown/bls](packages/bls)**             | Standalone Business Logic Server | ✅ Active   | `createBlsServer()` — HTTP server that validates ILP payments and stores events, NIP-34 integration                     |
 | **[@crosstown/faucet](packages/faucet)**       | Token distribution service       | ✅ Active   | Web-based faucet for distributing test ETH and AGENT tokens to developers                                               |
@@ -353,7 +356,6 @@ The BLS validates in this order (fail-fast):
 **Special rules:**
 
 - **Relay owner writes free** — You don't pay to publish on your own relay (checked after signature verification)
-- **SPSP bootstrap pricing** — kind:23194 events can have lower minimums to make joining the network cheaper
 
 ### 2. TOON-Native Format
 
@@ -405,7 +407,7 @@ sig: cccc...cccc
 | Phase         | What Happens                                                                                                                                                      | Triggered By             |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
 | **Discovery** | `RelayMonitor` subscribes to kind:10032 events and maintains a live list of available peers                                                                       | Automatic (continuous)   |
-| **Peering**   | You explicitly call `node.peerWith(pubkey)` which triggers: connector registration → SPSP handshake (kind:23194/23195) → settlement negotiation → channel opening | Manual (when you decide) |
+| **Peering**   | You explicitly call `node.peerWith(pubkey)` which triggers: read kind:10032 → connector registration → local chain negotiation → unilateral channel opening | Manual (when you decide) |
 
 **Why this matters:**
 
@@ -432,11 +434,11 @@ for (const peer of discovered) {
 
 **Problem:** Different nodes may support different blockchains for settlement. How do they agree?
 
-**Solution:** Automated chain negotiation during the SPSP handshake.
+**Solution:** Automated local chain negotiation using publicly advertised kind:10032 data.
 
 **How it works:**
 
-1. **Advertise** — Both nodes publish kind:10032 events listing their supported chains:
+1. **Advertise** — Both nodes publish kind:10032 events listing their supported chains, settlement addresses, and TokenNetwork contracts:
 
    ```json
    {
@@ -444,19 +446,20 @@ for (const peer of discovered) {
      "settlementAddresses": {
        "evm:base:84532": "0xABC...",
        "evm:sepolia:11155111": "0xDEF..."
+     },
+     "tokenNetworks": {
+       "evm:base:84532": "0x733..."
      }
    }
    ```
 
-2. **Request** — Joiner sends kind:23194: "I want to peer, I support chains X, Y, Z"
-
-3. **Negotiate** — Genesis node runs `negotiateSettlementChain()` to find common chains:
+2. **Negotiate locally** — Joiner runs `negotiateSettlementChain()` against peer's kind:10032 data:
    - Finds intersection of supported chains
    - Picks optimal chain (prefer mainnet > testnet, lower fees > higher)
 
-4. **Open Channel** — Genesis calls `connector.openChannel()` on the negotiated chain
+3. **Open Channel unilaterally** — Joiner calls `openChannel(peerAddress, timeout)` on the negotiated chain's TokenNetwork contract. The contract enforces one channel per participant pair
 
-5. **Response** — Genesis sends kind:23195: "Channel opened on chain B, address 0x123, channel ID abc"
+4. **Transact with self-describing claims** — BTP claims include `chainId`, `tokenNetworkAddress`, and `channelId`. The receiving connector verifies the channel on-chain (first time) then caches for subsequent claims
 
 **Chain format:** `{blockchain}:{network}:{chainId}`
 
@@ -524,7 +527,7 @@ pnpm demo:ilp-gated-relay
 1. Creates two nodes (genesis and joiner) with mock ILP connectors
 2. Genesis publishes its kind:10032 peer info event
 3. Joiner discovers genesis via relay subscription
-4. Joiner handshakes with genesis (kind:23194/23195)
+4. Joiner registers with genesis, negotiates chain locally, opens payment channel
 5. Joiner announces itself by paying to write its own kind:10032 event
 
 ### Local Development Stack (Recommended)
@@ -631,16 +634,16 @@ Crosstown implements and extends several Nostr event kinds:
 
 **Status:** ⚠️ Implemented in Crosstown, not yet submitted as formal NIP
 
-| Kind      | Name          | Type                         | Purpose                                                                                         |
-| --------- | ------------- | ---------------------------- | ----------------------------------------------------------------------------------------------- |
-| **10032** | ILP Peer Info | Parameterized replaceable    | Advertise ILP connector details (address, BTP endpoint, supported chains, settlement addresses) |
-| **23194** | SPSP Request  | Ephemeral encrypted (NIP-44) | Request payment channel setup with settlement chain negotiation                                 |
-| **23195** | SPSP Response | Ephemeral encrypted (NIP-44) | Respond with opened channel ID and payment destination                                          |
+| Kind      | Name          | Type                      | Purpose                                                                                                                      |
+| --------- | ------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **10032** | ILP Peer Info | Parameterized replaceable | Advertise ILP connector details (address, BTP endpoint, supported chains, settlement addresses, TokenNetwork contracts)      |
+
+> **Removed:** SPSP events (kind:23194/23195) were previously used for encrypted payment channel negotiation but have been removed from the protocol. Settlement details are now fully public in kind:10032, and BTP claims carry chain/contract coordinates for trustless on-chain verification.
 
 **Why this could be a NIP:**
 
 - Enables **decentralized ILP connector discovery** without DNS or central registries
-- Provides **encrypted payment channel negotiation** using existing Nostr infrastructure
+- Settlement info is public and verifiable — no encrypted handshake needed
 - Makes **micropayment routing** inherit Nostr's social graph (follow someone → route payments through them)
 
 **Future work:** Submit to `nostr-protocol/nips` repository for standardization
@@ -651,11 +654,9 @@ Crosstown implements and extends several Nostr event kinds:
 
 - [NIP-01: Basic Protocol](https://github.com/nostr-protocol/nips/blob/master/01.md) — Base Nostr relay protocol
 - [NIP-34: Git Stuff](https://github.com/nostr-protocol/nips/blob/master/34.md) — Git operations via Nostr events (repositories, patches, issues)
-- [NIP-44: Encrypted Payloads](https://github.com/nostr-protocol/nips/blob/master/44.md) — Secures SPSP handshakes
+- [NIP-44: Encrypted Payloads](https://github.com/nostr-protocol/nips/blob/master/44.md) — Encrypted Nostr messaging
 
 ### Interledger Specifications
-
-- [RFC 0009: SPSP](https://interledger.org/developers/rfcs/simple-payment-setup-protocol/) — Simple Payment Setup Protocol
 - [RFC 0027: ILPv4](https://interledger.org/developers/rfcs/interledger-protocol-v4/) — Interledger Protocol V4
 - [RFC 0032: Peering, Clearing and Settlement](https://interledger.org/developers/rfcs/peering-clearing-settling/) — ILP peering model
 - [RFC 0035: ILP Over HTTP](https://interledger.org/developers/rfcs/ilp-over-http/) — Transport ILP packets over HTTP
