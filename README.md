@@ -23,7 +23,7 @@ Three layers, each doing one thing:
 | Layer | Responsibility | Key Package |
 |-------|---------------|-------------|
 | **Discovery** | Find peers via Nostr events | [`@crosstown/core`](packages/core) |
-| **Payment** | Route micropayments between nodes | ILP Connector |
+| **Payment** | Route micropayments between nodes | [ILP Connector](https://github.com/ALLiDoizCode/connector) |
 | **Storage** | Accept paid events, serve them free | [`@crosstown/town`](packages/town) |
 
 The key insight: **Nostr's social graph becomes the payment routing graph.** Follow someone, route payments through them, access their services.
