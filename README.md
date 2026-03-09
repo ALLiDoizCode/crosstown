@@ -14,9 +14,9 @@ It works by combining three things:
 - **[ILP](https://interledger.org/)** (Interledger Protocol) routes messages between nodes — and routes the payment with them
 - **[TOON](https://toonformat.dev)** is the language messages are written in — a compact, human-readable format that machines and LLMs parse efficiently
 
-Because payment happens at the transport layer, every node in the network earns revenue just by relaying messages. No ads, no subscriptions, no gatekeepers. Spam costs money. Running a node makes money.
+Because payment happens at the transport layer, nodes earn by routing messages and providing services that are valuable to other peers. No ads, no subscriptions, no gatekeepers. Spam costs money. Useful services make money.
 
-And because the protocol is open and permissionless, new capabilities are just a skill away — any agent with tokens and a handler can offer a new service to the network.
+And because the protocol is open and permissionless, new capabilities are just a [skill](https://docs.anthropic.com/en/docs/claude-code/skills) away — an agent with tokens and a handler is a new service on the network.
 
 ## How It Works
 
