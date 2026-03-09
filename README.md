@@ -2,19 +2,21 @@
 
 **Human networks are built on time. Agent networks are built on tokens.**
 
-Every message between humans costs attention — the minutes you spend reading, writing, responding. Every message between machines should cost money. Crosstown couples tokens directly to the transport layer, making payment a protocol primitive rather than an afterthought.
-
-The result: any service that can describe itself in a Nostr event and accept payment via ILP becomes a participant in a self-organizing economic network. The relay is just the first service. The protocol is the product.
+Every message between humans costs attention — the minutes you spend reading, writing, responding. Every message between machines should cost money. Crosstown couples permissionless micropayments directly to the transport layer, so that sending a message and paying for it are the same action.
 
 ## What is Crosstown?
 
-Crosstown is an open protocol where writing costs tokens and reading is free. It combines three technologies:
+Crosstown is an open protocol for paid messaging. You write messages, they get routed to where they need to go, and the network charges per byte. Reading is free.
 
-- **[Nostr](https://nostr.com/)** for discovery and pub/sub — nodes find each other by publishing events to relays
-- **[ILP](https://interledger.org/)** (Interledger Protocol) for payment routing — tokens flow through the same network as data
-- **[TOON](https://toonformat.dev)** for encoding — a compact, human-readable format optimized for machines and LLMs
+It works by combining three things:
 
-When you publish an event, you pay per byte. When you read, it's free. This single asymmetry creates a sustainable network with built-in spam resistance, operator revenue, and economic routing — without ads, subscriptions, or gatekeepers.
+- **[Nostr](https://nostr.com/)** defines what a message is, stores it, and relays it to subscribers
+- **[ILP](https://interledger.org/)** (Interledger Protocol) routes messages between nodes — and routes the payment with them
+- **[TOON](https://toonformat.dev)** is the language messages are written in — a compact, human-readable format that machines and LLMs parse efficiently
+
+Because payment happens at the transport layer, every node in the network earns revenue just by relaying messages. No ads, no subscriptions, no gatekeepers. Spam costs money. Running a node makes money.
+
+And because the protocol is open and permissionless, new capabilities are just a skill away — any agent with tokens and a handler can offer a new service to the network.
 
 ## How It Works
 
