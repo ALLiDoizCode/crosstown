@@ -1,0 +1,32 @@
+{
+  "name": "crosstown-town-example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Examples for @crosstown/town - running a full Crosstown relay node",
+  "scripts": {
+    "start-town": "tsx src/01-start-town.ts",
+    "full-lifecycle": "tsx src/02-full-lifecycle.ts",
+    "subscribe": "tsx src/03-subscribe.ts",
+    "embedded-town": "tsx src/04-embedded-town.ts"
+  },
+  "dependencies": {
+    "@crosstown/town": "workspace:*",
+    "@crosstown/sdk": "workspace:*",
+    "@crosstown/core": "workspace:*",
+    "@crosstown/connector": "^1.7.0",
+    "nostr-tools": "^2.20.0",
+    "pino": "^9.0.0",
+    "ws": "^8.0.0",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.3.0",
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

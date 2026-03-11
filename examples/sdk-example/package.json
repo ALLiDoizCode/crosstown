@@ -1,0 +1,30 @@
+{
+  "name": "crosstown-sdk-example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Examples for @crosstown/sdk - building ILP-gated Nostr services",
+  "scripts": {
+    "identity": "tsx src/01-identity.ts",
+    "create-node": "tsx src/02-create-node.ts",
+    "publish-event": "tsx src/03-publish-event.ts",
+    "payment-channel": "tsx src/04-payment-channel.ts",
+    "standalone-server": "tsx src/05-standalone-server.ts"
+  },
+  "dependencies": {
+    "@crosstown/sdk": "workspace:*",
+    "@crosstown/connector": "^1.7.0",
+    "@crosstown/core": "workspace:*",
+    "nostr-tools": "^2.20.0",
+    "pino": "^9.0.0",
+    "viem": "^2.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.3.0",
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
