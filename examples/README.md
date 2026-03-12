@@ -1,6 +1,6 @@
 # Crosstown Examples
 
-Self-contained examples for building ILP-gated Nostr services with Crosstown. No external infrastructure required — everything runs in-process.
+Self-contained examples for building ILP-gated Nostr services with Crosstown.
 
 ## Deployment Modes
 
@@ -51,7 +51,7 @@ const town = await startTown({
 
 ## Connector Routing Fee
 
-The connector charges a 0.1% routing fee (hardcoded in `@crosstown/connector@1.6.x`). This fee is only active when settlement is enabled (`SETTLEMENT_ENABLED=true`).
+The connector charges a 0.1% routing fee (hardcoded in `@crosstown/connector@1.7.x`). This fee is only active when settlement is enabled (`SETTLEMENT_ENABLED=true`).
 
 - **Without settlement:** Both sender and receiver use the same `basePricePerByte`. No fee is deducted.
 - **With settlement:** The sender sets a ~10% higher `basePricePerByte` (e.g., 11 vs 10) so the forwarded amount still meets the receiver's minimum after the connector deducts its fee.
@@ -93,3 +93,19 @@ npm run full-lifecycle # 02
 npm run subscribe      # 03
 npm run embedded-town  # 04
 ```
+
+### Client Examples (`examples/client-example/`)
+
+| # | Example | Infra Required |
+|---|---------|----------------|
+| 01 | Publish Event | SDK E2E (Anvil + peers) |
+| 02 | Payment Channel Lifecycle | SDK E2E (Anvil + peers) |
+
+```bash
+cd examples/client-example && npm install
+# Start infrastructure first: ./scripts/sdk-e2e-infra.sh up
+npm run publish-event     # 01
+npm run payment-channel   # 02
+```
+
+See [examples/client-example/README.md](client-example/README.md) for details on self-describing claims and how the client differs from SDK/Town.
