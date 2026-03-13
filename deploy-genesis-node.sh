@@ -3,7 +3,7 @@
 #
 # This script deploys a complete Crosstown genesis node with:
 # - Anvil (local Ethereum blockchain with payment channel contracts)
-# - Token Faucet (ETH + AGENT token distribution)
+# - Token Faucet (ETH + USDC distribution)
 # - ILP Connector (packet routing + settlement)
 # - Crosstown Node (Nostr relay + BLS + bootstrap service)
 #
@@ -161,7 +161,8 @@ ILP_ADDRESS=g.crosstown.genesis
 # Network Configuration
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# BTP endpoint for peer connections
+# BTP endpoint for peer connections (Docker-internal, TLS unnecessary)
+# nosemgrep: detect-insecure-websocket
 BTP_ENDPOINT=ws://connector:3000
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -189,7 +190,7 @@ M2M_TOKEN_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
 # Token network registry (deployed by Anvil on startup)
 BASE_REGISTRY_ADDRESS=0xe7f1725e7734ce288f8367e1bb143e90bb3f0512
 
-# Genesis node wallet (Anvil account #0 - has 10k ETH + 1M AGENT)
+# Genesis node wallet (Anvil account #0 - has 10k ETH + 1M USDC)
 PEER_EVM_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -326,9 +327,9 @@ TOKEN_CODE=$(curl -s http://localhost:8545 -X POST -H "Content-Type: application
     | jq -r '.result')
 
 if [ "$TOKEN_CODE" != "0x" ] && [ ${#TOKEN_CODE} -gt 10 ]; then
-    log_success "AGENT token contract deployed"
+    log_success "USDC token contract deployed"
 else
-    log_warning "AGENT token contract not found (may deploy on first use)"
+    log_warning "USDC token contract not found (may deploy on first use)"
 fi
 
 # Check faucet info
@@ -339,7 +340,7 @@ FAUCET_READY=$(echo "$FAUCET_INFO" | jq -r '.ready // false')
 if [ "$FAUCET_READY" = "true" ]; then
     ETH_BALANCE=$(echo "$FAUCET_INFO" | jq -r '.faucetBalances.eth // "unknown"')
     TOKEN_BALANCE=$(echo "$FAUCET_INFO" | jq -r '.faucetBalances.token // "unknown"')
-    log_success "Faucet ready (ETH: $ETH_BALANCE, AGENT: $TOKEN_BALANCE)"
+    log_success "Faucet ready (ETH: $ETH_BALANCE, USDC: $TOKEN_BALANCE)"
 else
     log_warning "Faucet not fully initialized yet"
 fi
@@ -367,7 +368,7 @@ ${BOLD}Service Endpoints:${NC}
   ${GREEN}⛓️  Anvil (Local Blockchain)${NC}
      RPC URL:          ${CYAN}http://localhost:8545${NC}
      Chain ID:         31337
-     AGENT Token:      0x5FbDB2315678afecb367f032d93F642f64180aa3
+     USDC Token:       0x5FbDB2315678afecb367f032d93F642f64180aa3
      Token Registry:   0xe7f1725e7734ce288f8367e1bb143e90bb3f0512
 
   ${GREEN}🔌 ILP Connector${NC}
@@ -408,7 +409,7 @@ ${BOLD}Pre-funded Test Accounts:${NC}
 
   ${BOLD}Account 0${NC} (Genesis Node - Deployer)
     Address:  0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-    Balance:  10,000 ETH + 1,000,000 AGENT
+    Balance:  10,000 ETH + 1,000,000 USDC
     Private:  0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
   ${BOLD}Account 1${NC} (Faucet Source)
@@ -428,7 +429,7 @@ ${BOLD}Quick Start Guide:${NC}
   ${BOLD}1. Get tokens for a new wallet:${NC}
      → Open ${CYAN}http://localhost:3500${NC}
      → Enter your wallet address
-     → Receive 100 ETH + 10,000 AGENT tokens
+     → Receive 100 ETH + 10,000 USDC
 
   ${BOLD}2. Monitor the genesis node:${NC}
      → docker compose -p crosstown-genesis -f $COMPOSE_FILE logs -f crosstown
